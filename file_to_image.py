@@ -9,7 +9,6 @@ def produce_image(filename, save=True, save_name=None, coastlines=False):
     # load file
     global_scene = Scene(reader="seviri_l1b_native", filenames=[filename], reader_kwargs={'fill_disk': True})
     global_scene.load(['HRV'], upper_right_corner='NE')
-    print(global_scene.available_dataset_names())
     # define area
     area_id = '1'
     x_size = 1000
@@ -24,9 +23,13 @@ def produce_image(filename, save=True, save_name=None, coastlines=False):
     scene2 = global_scene.resample(a)
     fig, ax = plt.subplots(1, 1, subplot_kw=dict(projection=crs))
     img = get_enhanced_image(scene2['HRV']).data.transpose('y', 'x', 'bands')
-    ax.imshow(img, transform=crs, extent=crs.bounds, origin='upper', cmap='jet')
+    ax.imshow(img, transform=crs, extent=crs.bounds, origin='upper', cmap='gray')
     if coastlines:
         ax.coastlines()
+
+    # ax.plot([-9.19, -8.82], [51.74, 51.99], marker='x', transform=crs, color='red')
+    # ax.plot([-9.66, -9.37], [51.73, 51.99], marker='x', transform=crs, color='red')
+
 
     if save:
         if save_name is None:
@@ -34,8 +37,10 @@ def produce_image(filename, save=True, save_name=None, coastlines=False):
             if coastlines:
                 save_name = 'coastlines_' + save_name
         plt.savefig('images/' + save_name + '.png')
+    return fig, ax
 
 
-produce_image(
+fig, ax = produce_image(
     'data/MSG3-SEVI-MSG15-0100-NA-20150414124241.311000000Z-NA/MSG3-SEVI-MSG15-0100-NA-20150414124241.311000000Z-NA.nat'
-    , coastlines=True)
+    , save=False)
+plt.show()
