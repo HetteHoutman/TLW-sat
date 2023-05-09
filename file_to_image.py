@@ -5,7 +5,7 @@ from satpy.writers import get_enhanced_image
 from pyresample import get_area_def
 
 
-def produce_image(filename, save=True, save_name=None, coastlines=False):
+def produce_scene(filename):
     # load file
     global_scene = Scene(reader="seviri_l1b_native", filenames=[filename], reader_kwargs={'fill_disk': True})
     global_scene.load(['HRV'], upper_right_corner='NE')
@@ -21,16 +21,17 @@ def produce_image(filename, save=True, save_name=None, coastlines=False):
     crs = a.to_cartopy_crs()
 
     scene2 = global_scene.resample(a)
+    return scene2, crs
+
+
+def produce_image(scene2, crs, filename, coastlines=False, save_name=None, save=False):
     fig, ax = plt.subplots(1, 1, subplot_kw=dict(projection=crs))
     img = get_enhanced_image(scene2['HRV']).data.transpose('y', 'x', 'bands')
     ax.imshow(img, transform=crs, extent=crs.bounds, origin='upper', cmap='gray')
     if coastlines:
         ax.coastlines()
-
-    # ax.plot([-9.19, -8.82], [51.74, 51.99], marker='x', transform=crs, color='red')
-    # ax.plot([-9.66, -9.37], [51.73, 51.99], marker='x', transform=crs, color='red')
-
-
+    ax.plot([-9.19, -8.82], [51.74, 51.99], marker='x', transform=crs, color='red')
+    ax.plot([-9.66, -9.37], [51.73, 51.99], marker='x', transform=crs, color='blue')
     if save:
         if save_name is None:
             save_name = f'{filename[-32:-28]}-{filename[-28:-26]}-{filename[-26:-24]}_{filename[-24:-22]}_{filename[-22:-20]}'
@@ -40,7 +41,10 @@ def produce_image(filename, save=True, save_name=None, coastlines=False):
     return fig, ax
 
 
-fig, ax = produce_image(
-    'data/MSG3-SEVI-MSG15-0100-NA-20150414124241.311000000Z-NA/MSG3-SEVI-MSG15-0100-NA-20150414124241.311000000Z-NA.nat'
-    , save=False)
-plt.show()
+if __name__ == '__main__':
+    file = 'data/MSG3-SEVI-MSG15-0100-NA-20150414124241.311000000Z-NA/MSG3-SEVI-MSG15-0100-NA-20150414124241' \
+           '.311000000Z-NA.nat'
+    scene, crs = produce_scene(file)
+
+    fig, ax = produce_image(scene, crs, file, save=False)
+    plt.show()
