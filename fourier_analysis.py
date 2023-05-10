@@ -1,4 +1,3 @@
-import matplotlib.pyplot as plt
 import numpy as np
 from file_to_image import *
 
@@ -36,15 +35,16 @@ ax2.imshow(abs(shifted_ft), norm='log')
 plt.tight_layout()
 plt.show()
 
+fig, axes = plt.subplots(1, 2)
 temp = shifted_ft.copy()
-temp[temp<200] = 1
-plt.imshow(abs(np.fft.ifft2(temp)), cmap='gray')
+temp[temp < 100] = 1
+axes[0].imshow(abs(temp), norm='log')
+axes[1].imshow(abs(np.fft.ifft2(temp)), cmap='gray')
 plt.show()
 
+fig, axes = plt.subplots(1, 2)
 temp = shifted_ft.copy()
-temp[:,50] = 1
-plt.imshow(abs(temp))
-plt.show()
-
-plt.imshow(abs(np.fft.ifft2(temp)), cmap='gray')
+temp[:, 50] = 1
+axes[0].imshow(abs(temp))
+axes[1].imshow(abs(np.fft.ifft2(temp)), cmap='gray')
 plt.show()
