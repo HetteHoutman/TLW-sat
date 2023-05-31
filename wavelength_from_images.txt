@@ -34,11 +34,14 @@
 12:42
 51.74, 9.19
 51.99, 8.82
+(51.96, 8.8)
 ------------
 37.66km
+(36.28km)
 5 wavelengths
 
 7.53 km
+(7.26km)
 
 51.73, 9.66
 51.98, 9.37
@@ -50,3 +53,16 @@
 
 
 Leanne observes 6.7 but cant find where she did the measurement.
+
+linear theory with:
+N1 = 0.007
+N2 = 0.016
+U0 = 9.3
+delta theta = 4.9
+theta0 = 286
+H = 775
+gives
+
+3.65 km 
+
+

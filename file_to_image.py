@@ -32,14 +32,14 @@ def produce_image(scene2, crs, filename, coastlines=False, save_name=None, save=
     ax.imshow(img, transform=crs, extent=crs.bounds, origin='upper', cmap='gray')
     if coastlines:
         ax.coastlines()
-    # ax.plot([-9.19, -8.82], [51.74, 51.99], marker='x', transform=crs, color='red')
-    # ax.plot([-9.66, -9.37], [51.73, 51.99], marker='x', transform=crs, color='blue')
+    ax.plot([-9.19, -8.82], [51.74, 51.99], marker='x', transform=crs, color='red')
+    ax.plot([-9.66, -9.37], [51.73, 51.99], marker='x', transform=crs, color='blue')
     if save:
         if save_name is None:
             save_name = f'{filename[-32:-28]}-{filename[-28:-26]}-{filename[-26:-24]}_{filename[-24:-22]}_{filename[-22:-20]}'
             if coastlines:
                 save_name = 'coastlines_' + save_name
-        plt.savefig('images/' + save_name + '.png')
+        plt.savefig('images/' + save_name + '.png', dpi=300)
     return fig, ax
 
 
@@ -50,5 +50,5 @@ if __name__ == '__main__':
                                # area_extent=[-11, 50, -7, 53]
                                )
 
-    fig, ax = produce_image(scene, crs, file, save=False)
+    fig, ax = produce_image(scene, crs, file, save=True, save_name='test')
     plt.show()
