@@ -50,40 +50,12 @@ def ideal_bandpass(ft, Lx, Ly, low, high):
 
     return temp
 
-
-def basic_plot(img, shifted_ft, Lx, Ly):
-    fig, (ax1, ax2) = plt.subplots(1, 2)
-
-    xlen = img.shape[1]
-    ylen = img.shape[0]
-
-    pixel_x = Lx / xlen
-    pixel_y = Ly / ylen
-
-    ax1.imshow(img,
-               extent=[-Lx / 2 - pixel_x / 2, Lx / 2 + pixel_x / 2, -Ly / 2 - pixel_y / 2, Ly / 2 + pixel_y / 2],
-               cmap='gray')
-    ax1.set_xlabel('x distance / km')
-    ax1.set_ylabel('y distance / km')
-
-    max_k = xlen // 2 * 2 * np.pi / Lx
-    max_l = ylen // 2 * 2 * np.pi / Ly
-    pixel_k = 2 * max_k / xlen
-    pixel_l = 2 * max_l / ylen
-
-    ax2.imshow(abs(shifted_ft),
-               extent=[-max_k - pixel_k / 2, max_k + pixel_k / 2, -max_l - pixel_l / 2, max_l + pixel_l / 2],
-               norm='log')
-    ax2.set_xlabel('k / km^-1')
-    ax2.set_ylabel('l / km^-1')
-
-    plt.tight_layout()
-    plt.show()
-
-
-def filtered_inv_plot(img, filtered_ft, Lx, Ly):
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
-
+def filtered_inv_plot(img, filtered_ft, Lx, Ly, inverse=True):
+    # TODO want to be able to plot lambda instead of k/l
+    if inverse:
+        fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
+    else:
+        fig, (ax1, ax2) = plt.subplots(1, 2)
     xlen = img.shape[1]
     ylen = img.shape[0]
 
@@ -107,13 +79,14 @@ def filtered_inv_plot(img, filtered_ft, Lx, Ly):
     ax2.set_xlabel('k / km^-1')
     ax2.set_ylabel('l / km^-1')
 
-    inv = np.fft.ifft2(filtered_ft)
-    ax3.imshow(abs(inv),
-               extent=[-Lx / 2 - pixel_x / 2, Lx / 2 + pixel_x / 2, -Ly / 2 - pixel_y / 2, Ly / 2 + pixel_y / 2],
-               cmap='gray')
+    if inverse:
+        inv = np.fft.ifft2(filtered_ft)
+        ax3.imshow(abs(inv),
+                   extent=[-Lx / 2 - pixel_x / 2, Lx / 2 + pixel_x / 2, -Ly / 2 - pixel_y / 2, Ly / 2 + pixel_y / 2],
+                   cmap='gray')
 
-    ax3.set_xlabel('x distance / km')
-    ax3.set_ylabel('y distance / km')
+        ax3.set_xlabel('x distance / km')
+        ax3.set_ylabel('y distance / km')
 
     plt.tight_layout()
     plt.show()
@@ -137,4 +110,4 @@ if __name__ == '__main__':
     max_lambda = 15
     filtered = ideal_bandpass(shifted_ft, Lx, Ly, 2 * np.pi / max_lambda, 2 * np.pi / min_lambda)
     inv = np.fft.ifft2(shifted_ft)
-    filtered_inv_plot(orig, filtered, Lx, Ly)
+    filtered_inv_plot(orig, filtered, Lx, Ly, inverse=True)
