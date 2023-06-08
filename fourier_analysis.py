@@ -32,6 +32,19 @@ def middle_line_masked_plot():
 
 
 def ideal_bandpass(ft, Lx, Ly, low, high):
+    _, _, dist_array = recip_distances(Lx, Ly, ft)
+
+    low_mask = (dist_array < low)
+    high_mask = (dist_array > high)
+    masked = np.ma.masked_where(low_mask | high_mask, ft)
+    temp = ft.copy()
+    temp[low_mask | high_mask] = 1
+
+    return masked
+
+
+def recip_distances(Lx, Ly, ft):
+    # TODO use shape instead of ft
     xlen = ft.shape[1]
     ylen = ft.shape[0]
 
@@ -40,20 +53,13 @@ def ideal_bandpass(ft, Lx, Ly, low, high):
 
     k = np.linspace(-max_k, max_k, xlen, endpoint=True)
     l = np.linspace(-max_l, max_l, ylen, endpoint=True)
-
     K, L = np.meshgrid(k, l)
 
     dist_array = np.sqrt(K ** 2 + L ** 2)
-
-    low_mask = (dist_array < low)
-    high_mask = (dist_array > high)
-    temp = ft.copy()
-    temp[low_mask | high_mask] = 1
-
-    return temp
+    return K, L, dist_array
 
 
-def filtered_inv_plot(img, filtered_ft, Lx, Ly, latlon=None, inverse_fft=True):
+def filtered_inv_plot(img, filtered_ft, Lx, Ly, latlon=None, inverse_fft=True, wavelength=True):
     # TODO want to be able to plot lambda instead of k/l
 
     if inverse_fft:
@@ -82,7 +88,7 @@ def filtered_inv_plot(img, filtered_ft, Lx, Ly, latlon=None, inverse_fft=True):
     ax1.set_xlabel(xlabel)
 
     if inverse_fft:
-        inv = np.fft.ifft2(filtered_ft)
+        inv = np.fft.ifft2(filtered_ft.filled(fill_value=1))
         ax3.imshow(abs(inv),
                    extent=physical_extent,
                    cmap='gray')
@@ -90,16 +96,23 @@ def filtered_inv_plot(img, filtered_ft, Lx, Ly, latlon=None, inverse_fft=True):
     plt.tight_layout()
     plt.show()
 
-    fig2, ax2 = plt.subplots(1,1)
+    fig2, ax2 = plt.subplots(1, 1)
 
     max_k = xlen // 2 * 2 * np.pi / Lx
     max_l = ylen // 2 * 2 * np.pi / Ly
     pixel_k = 2 * max_k / xlen
     pixel_l = 2 * max_l / ylen
     recip_extent = [-max_k - pixel_k / 2, max_k + pixel_k / 2, -max_l - pixel_l / 2, max_l + pixel_l / 2]
+
     ax2.imshow(abs(filtered_ft),
                extent=recip_extent,
-               norm='linear')
+               norm='log')
+    if wavelength:
+        K, L, dist_array = recip_distances(Lx, Ly, ft)
+        wavelengths = 2 * np.pi / dist_array
+        con = ax2.contour(K, L, wavelengths, levels=[5, 10], colors=['k'], linestyles=['--'])
+        ax2.clabel(con)
+
     ax2.set_xlabel('k / km^-1')
     ax2.set_ylabel('l / km^-1')
 
@@ -128,5 +141,4 @@ if __name__ == '__main__':
     min_lambda = 2
     max_lambda = 20
     filtered = ideal_bandpass(shifted_ft, Lx, Ly, 2 * np.pi / max_lambda, 2 * np.pi / min_lambda)
-    inv = np.fft.ifft2(shifted_ft)
     filtered_inv_plot(orig, filtered, Lx, Ly, latlon=area_extent, inverse_fft=True)
