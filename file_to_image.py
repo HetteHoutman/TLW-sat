@@ -17,8 +17,8 @@ def produce_scene(filename, area_extent=None):
 
     # define area
     area_id = '1'
-    x_size = (area_extent[2] - area_extent[0]) * 100
-    y_size = (area_extent[3] - area_extent[1]) * 100
+    x_size = (area_extent[2] - area_extent[0]) * 101
+    y_size = (area_extent[3] - area_extent[1]) * 101
     projection = ccrs.PlateCarree().proj4_params
     description = "UK"
     proj_id = 'PlateCarree'
