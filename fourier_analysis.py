@@ -34,7 +34,7 @@ def middle_line_masked_plot():
 
 
 def ideal_bandpass(ft, Lx, Ly, low, high):
-    _, _, dist_array = recip_distances(Lx, Ly, ft)
+    _, _, dist_array, thetas = recip_distances(Lx, Ly, ft)
 
     low_mask = (dist_array < low)
     high_mask = (dist_array > high)
@@ -61,7 +61,9 @@ def recip_distances(Lx, Ly, ft):
     K, L = np.meshgrid(k, l)
 
     dist_array = np.sqrt(K ** 2 + L ** 2)
-    return K, L, dist_array
+    thetas = np.rad2deg(np.arctan2(K, L)) + 90
+    thetas %= 360
+    return K, L, dist_array, thetas
 
 
 def filtered_inv_plot(img, filtered_ft, Lx, Ly, latlon=None, inverse_fft=True, wavelength=True):
@@ -113,7 +115,7 @@ def filtered_inv_plot(img, filtered_ft, Lx, Ly, latlon=None, inverse_fft=True, w
                extent=recip_extent,
                norm='log')
     if wavelength:
-        K, L, dist_array = recip_distances(Lx, Ly, ft)
+        K, L, dist_array, thetas = recip_distances(Lx, Ly, ft)
         wavelengths = 2 * np.pi / dist_array
         con = ax2.contour(K, L, wavelengths, levels=[5, 10], colors=['k'], linestyles=['--'])
         ax2.clabel(con)
@@ -156,7 +158,7 @@ if __name__ == '__main__':
                       inverse_fft=True)
 
     # -------- other stuff -------------
-    K, L, wavenumbers = recip_distances(Lx, Ly, ft)
+    K, L, wavenumbers, thetas = recip_distances(Lx, Ly, ft)
     wavelengths = 2 * np.pi / wavenumbers
     selec_dists = wavenumbers[~filtered.mask]
     highest = 115
@@ -167,23 +169,31 @@ if __name__ == '__main__':
           f'{np.average(wavelengths[~filtered.mask], weights=abs(filtered).compressed()):.2f} km')
 
     # -------- power spectrum ----------
-    filtered_amplitudes = abs(shifted_ft) ** 2
-    npix = 2 * np.pi / min_lambda
+    filtered_amplitudes = abs(bandpassed) ** 2
+
     kbins = np.arange(1, 60) / 10
     kvals = 0.5 * (kbins[1:] + kbins[:-1])
-    Abins, _, _ = stats.binned_statistic(wavenumbers.flatten(), filtered_amplitudes.flatten(),
+    pspec, _, _ = stats.binned_statistic(wavenumbers.flatten(), filtered_amplitudes.flatten(),
                                          statistic="mean",
                                          bins=kbins)
-    Abins *= np.pi * (kbins[1:] ** 2 - kbins[:-1] ** 2)
+    pspec *= np.pi * (kbins[1:] ** 2 - kbins[:-1] ** 2)
 
-    plt.loglog(kvals, Abins)
+    theta_parts = 144
+    thetabins = np.linspace(0, 360, theta_parts, endpoint=True)
+    thetavals = 0.5 * (thetabins[1:] + thetabins[:-1])
+    pspec_ang, _, _ = stats.binned_statistic(thetas.flatten(), filtered_amplitudes.flatten(),
+                                         statistic="mean",
+                                         bins=thetabins)
+    pspec_ang *= np.pi * ((2 * np.pi / min_lambda)**2 - (2 * np.pi / max_lambda)**2) / theta_parts
+
+    plt.loglog(kvals, pspec)
 
     xlen = orig.shape[1]
     ylen = orig.shape[0]
     pixel_x = Lx / xlen
     pixel_y = Ly / ylen
-    ymin = np.nanmin(Abins)
-    ymax = np.nanmax(Abins)
+    ymin = np.nanmin(pspec)
+    ymax = np.nanmax(pspec)
     plt.vlines(2 * np.pi / 8, ymin, ymax, 'k', linestyles='--')
     plt.vlines(2 * np.pi / min(Lx, Ly), ymin, ymax, 'k', linestyles='dotted')
     plt.vlines(np.pi / max(pixel_y, pixel_x), ymin, ymax, 'k', linestyles='dotted')
@@ -195,4 +205,14 @@ if __name__ == '__main__':
     plt.ylabel("$P(k)$")
     plt.ylim(ymin, ymax)
     plt.tight_layout()
+    plt.show()
+
+    plt.plot(thetavals, pspec_ang)
+    ax = plt.gca()
+    ax.set_yscale('log')
+    plt.title('Angular power spectrum')
+
+    plt.ylabel("$P(k)$")
+    plt.xlabel(r'$\theta$ (deg)')
+    plt.grid()
     plt.show()
