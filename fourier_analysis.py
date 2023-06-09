@@ -109,7 +109,7 @@ def filtered_inv_plot(img, filtered_ft, Lx, Ly, latlon=None, inverse_fft=True, w
     pixel_l = 2 * max_l / ylen
     recip_extent = [-max_k - pixel_k / 2, max_k + pixel_k / 2, -max_l - pixel_l / 2, max_l + pixel_l / 2]
 
-    ax2.imshow(abs(filtered_ft),
+    im = ax2.imshow(abs(filtered_ft)**2,
                extent=recip_extent,
                norm='log')
     if wavelength:
@@ -118,10 +118,12 @@ def filtered_inv_plot(img, filtered_ft, Lx, Ly, latlon=None, inverse_fft=True, w
         con = ax2.contour(K, L, wavelengths, levels=[5, 10], colors=['k'], linestyles=['--'])
         ax2.clabel(con)
 
+    ax2.set_title('2D Power Spectrum')
     ax2.set_xlabel('k / km^-1')
     ax2.set_ylabel('l / km^-1')
     ax2.set_xlim(-2, 2)
     ax2.set_ylim(-2, 2)
+    fig2.colorbar(im)
 
     plt.show()
 
