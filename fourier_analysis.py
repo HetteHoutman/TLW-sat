@@ -1,4 +1,6 @@
 import numpy as np
+from scipy import stats
+
 from file_to_image import produce_scene
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -37,9 +39,12 @@ def ideal_bandpass(ft, Lx, Ly, low, high):
     low_mask = (dist_array < low)
     high_mask = (dist_array > high)
     masked = np.ma.masked_where(low_mask | high_mask, ft)
-    temp = ft.copy()
-    temp[low_mask | high_mask] = 1
 
+    return masked
+
+
+def low_values_mask(ft, threshold):
+    masked = np.ma.masked_where(abs(ft) < threshold, ft)
     return masked
 
 
@@ -115,6 +120,8 @@ def filtered_inv_plot(img, filtered_ft, Lx, Ly, latlon=None, inverse_fft=True, w
 
     ax2.set_xlabel('k / km^-1')
     ax2.set_ylabel('l / km^-1')
+    ax2.set_xlim(-2, 2)
+    ax2.set_ylim(-2, 2)
 
     plt.show()
 
@@ -122,6 +129,7 @@ def filtered_inv_plot(img, filtered_ft, Lx, Ly, latlon=None, inverse_fft=True, w
 if __name__ == '__main__':
     filename = 'data/MSG3-SEVI-MSG15-0100-NA-20230419115741.383000000Z-NA/MSG3-SEVI-MSG15-0100-NA-20230419115741.383000000Z-NA.nat'
     area_extent = [-9, 54, -8, 55]
+    # area_extent = [-11.5, 49.5, 2, 60]
     g = pyproj.Geod(ellps='WGS84')
     _, _, Lx = g.inv(area_extent[0], (area_extent[3] + area_extent[1]) / 2,
                      area_extent[2], (area_extent[3] + area_extent[1]) / 2)
@@ -129,16 +137,59 @@ if __name__ == '__main__':
                      (area_extent[0] + area_extent[2]) / 2, area_extent[3])
     Lx /= 1000
     Ly /= 1000
-    # area_extent = [-11.5, 49.5, 2, 60]
     scene, crs = produce_scene(filename, area_extent=area_extent)
-    # img = get_enhanced_image(scene['HRV']).data.transpose('y', 'x', 'bands')
 
     orig = np.array(scene['HRV'].data)
     ft = np.fft.fft2(orig)
     shifted_ft = np.fft.fftshift(ft)
 
     # basic_plot(orig, shifted_ft, Lx, Ly)
-    min_lambda = 2
-    max_lambda = 20
-    filtered = ideal_bandpass(shifted_ft, Lx, Ly, 2 * np.pi / max_lambda, 2 * np.pi / min_lambda)
-    filtered_inv_plot(orig, filtered, Lx, Ly, latlon=area_extent, inverse_fft=True)
+    min_lambda = 5
+    max_lambda = 35
+    bandpassed = ideal_bandpass(shifted_ft, Lx, Ly, 2 * np.pi / max_lambda, 2 * np.pi / min_lambda)
+    threshold = abs(bandpassed.compressed()).mean()
+    filtered = low_values_mask(bandpassed, threshold)
+    filtered_inv_plot(orig, bandpassed, Lx, Ly,
+                      latlon=area_extent,
+                      inverse_fft=True)
+
+    # -------- other stuff -------------
+    K, L, wavenumbers = recip_distances(Lx, Ly, ft)
+    wavelengths = 2 * np.pi / wavenumbers
+    selec_dists = wavenumbers[~filtered.mask]
+    highest = 115
+    indices = np.argpartition(-abs(filtered.compressed()), highest)[:highest]
+    print(
+        f'Mean wavelength of the highest (most dominant) {highest} wavelengths is: {np.mean(2 * np.pi / selec_dists[indices]):.2f} km')
+    print(f'Average wavelength with fft value above the mean fft value weighted by fft value is '
+          f'{np.average(wavelengths[~filtered.mask], weights=abs(filtered).compressed()):.2f} km')
+
+    # -------- power spectrum ----------
+    filtered_amplitudes = abs(shifted_ft) ** 2
+    npix = 2 * np.pi / min_lambda
+    kbins = np.arange(1, 60) / 10
+    kvals = 0.5 * (kbins[1:] + kbins[:-1])
+    Abins, _, _ = stats.binned_statistic(wavenumbers.flatten(), filtered_amplitudes.flatten(),
+                                         statistic="mean",
+                                         bins=kbins)
+    Abins *= np.pi * (kbins[1:] ** 2 - kbins[:-1] ** 2)
+
+    plt.loglog(kvals, Abins)
+
+    xlen = orig.shape[1]
+    ylen = orig.shape[0]
+    pixel_x = Lx / xlen
+    pixel_y = Ly / ylen
+    ymin = np.nanmin(Abins)
+    ymax = np.nanmax(Abins)
+    plt.vlines(2 * np.pi / 8, ymin, ymax, 'k', linestyles='--')
+    plt.vlines(2 * np.pi / min(Lx, Ly), ymin, ymax, 'k', linestyles='dotted')
+    plt.vlines(np.pi / max(pixel_y, pixel_x), ymin, ymax, 'k', linestyles='dotted')
+    plt.vlines(2 * np.pi / min_lambda, ymin, ymax, 'k', linestyles='-.')
+    plt.vlines(2 * np.pi / max_lambda, ymin, ymax, 'k', linestyles='-.')
+
+    plt.xlabel("k / km^-1")
+    plt.ylabel("$P(k)$")
+    plt.ylim(ymin, ymax)
+    plt.tight_layout()
+    plt.show()
