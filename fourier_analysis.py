@@ -190,6 +190,7 @@ if __name__ == '__main__':
     plt.vlines(2 * np.pi / min_lambda, ymin, ymax, 'k', linestyles='-.')
     plt.vlines(2 * np.pi / max_lambda, ymin, ymax, 'k', linestyles='-.')
 
+    plt.title('1D Power Spectrum')
     plt.xlabel("k / km^-1")
     plt.ylabel("$P(k)$")
     plt.ylim(ymin, ymax)
