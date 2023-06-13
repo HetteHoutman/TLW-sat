@@ -56,7 +56,7 @@ def recip_space(Lx, Ly, shape):
     l = 2 * np.pi * np.fft.fftfreq(ylen, d=Ly / ylen)
 
     # do fft shift
-    K, L = np.meshgrid(np.roll(k, k.shape[0]//2), np.roll(l, l.shape[0]//2))
+    K, L = np.meshgrid(np.roll(k, k.shape[0] // 2), np.roll(l, l.shape[0] // 2))
 
     dist_array = np.sqrt(K ** 2 + L ** 2)
     thetas = -np.rad2deg(np.arctan2(K, L)) + 180
@@ -139,6 +139,47 @@ def extract_distances(area_extent):
     return Lx / 1000, Ly / 1000
 
 
+def create_bins(range, bin_width):
+    bins = np.linspace(range[0], np.ceil(range[1]), int(range[1] / bin_width) + 1)
+    vals = 0.5 * (bins[1:] + bins[:-1])
+    return bins, vals
+
+
+def plot_radial_pspec(pspec, vals):
+    plt.loglog(vals, pspec)
+
+    xlen = orig.shape[1]
+    ylen = orig.shape[0]
+    pixel_x = Lx / xlen
+    pixel_y = Ly / ylen
+    ymin = np.nanmin(radial_pspec)
+    ymax = np.nanmax(radial_pspec)
+
+    plt.vlines(2 * np.pi / 8, ymin, ymax, 'k', linestyles='--')
+    plt.vlines(2 * np.pi / min(Lx, Ly), ymin, ymax, 'k', linestyles='dotted')
+    plt.vlines(np.pi / max(pixel_y, pixel_x), ymin, ymax, 'k', linestyles='dotted')
+    plt.vlines(2 * np.pi / min_lambda, ymin, ymax, 'k', linestyles='-.')
+    plt.vlines(2 * np.pi / max_lambda, ymin, ymax, 'k', linestyles='-.')
+
+    plt.title('1D Power Spectrum')
+    plt.xlabel("k / km^-1")
+    plt.ylabel("$P(k)$")
+    plt.ylim(ymin, ymax)
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_ang_pspec(vals, pspec):
+    plt.plot(vals, pspec)
+    ax = plt.gca()
+    ax.set_yscale('log')
+    plt.title('Angular power spectrum')
+    plt.ylabel("$P(k)$")
+    plt.xlabel(r'$\theta$ (deg)')
+    plt.grid()
+    plt.show()
+
+
 if __name__ == '__main__':
     filename = 'data/MSG3-SEVI-MSG15-0100-NA-20230419115741.383000000Z-NA/MSG3-SEVI-MSG15-0100-NA-20230419115741.383000000Z-NA.nat'
     area_extent = [-9, 54, -8, 55]
@@ -171,52 +212,25 @@ if __name__ == '__main__':
     print(f'Average wavelength with fft value above the mean fft value weighted by fft value is '
           f'{np.average(wavelengths[~filtered.mask], weights=abs(filtered).compressed()):.2f} km')
 
+
     # -------- power spectrum ----------
     # TODO check if this is mathematically the right way of calculating pspec
-    filtered_amplitudes = abs(shifted_ft) ** 2
-
-    kbins = np.arange(1, 60) / 10
-    kvals = 0.5 * (kbins[1:] + kbins[:-1])
-    radial_pspec, _, _ = stats.binned_statistic(wavenumbers.flatten(), filtered_amplitudes.flatten(),
+    amplitudes = abs(shifted_ft) ** 2
+    wnum_bin_width = 0.1
+    wnum_bins, wnum_vals = create_bins((0, wavenumbers.max()), wnum_bin_width)
+    radial_pspec, _, _ = stats.binned_statistic(wavenumbers.flatten(), amplitudes.flatten(),
                                                 statistic="mean",
-                                                bins=kbins)
-    radial_pspec *= np.pi * (kbins[1:] ** 2 - kbins[:-1] ** 2)
+                                                bins=wnum_bins)
+    radial_pspec *= np.pi * (wnum_bins[1:] ** 2 - wnum_bins[:-1] ** 2)
 
-    theta_parts = 36
-    thetabins = np.linspace(0, 180, theta_parts, endpoint=True)
-    thetavals = 0.5 * (thetabins[1:] + thetabins[:-1])
-    pspec_ang, _, _ = stats.binned_statistic(thetas.flatten(), filtered_amplitudes.flatten(),
+    bandpassed_amplitudes = abs(bandpassed) ** 2
+    theta_bin_width = 10
+    theta_bins, theta_vals = create_bins((0, 180), theta_bin_width)
+    ang_pspec, _, _ = stats.binned_statistic(thetas.flatten(), bandpassed_amplitudes.flatten(),
                                              statistic="mean",
-                                             bins=thetabins)
-    pspec_ang *= np.pi * ((2 * np.pi / min_lambda) ** 2 - (2 * np.pi / max_lambda) ** 2) / theta_parts
+                                             bins=theta_bins)
+    ang_pspec *= np.deg2rad(theta_bin_width) * ((2 * np.pi / min_lambda) ** 2 - (2 * np.pi / max_lambda) ** 2)
 
-    plt.loglog(kvals, radial_pspec)
+    plot_radial_pspec(radial_pspec, wnum_vals)
 
-    xlen = orig.shape[1]
-    ylen = orig.shape[0]
-    pixel_x = Lx / xlen
-    pixel_y = Ly / ylen
-    ymin = np.nanmin(radial_pspec)
-    ymax = np.nanmax(radial_pspec)
-    plt.vlines(2 * np.pi / 8, ymin, ymax, 'k', linestyles='--')
-    plt.vlines(2 * np.pi / min(Lx, Ly), ymin, ymax, 'k', linestyles='dotted')
-    plt.vlines(np.pi / max(pixel_y, pixel_x), ymin, ymax, 'k', linestyles='dotted')
-    plt.vlines(2 * np.pi / min_lambda, ymin, ymax, 'k', linestyles='-.')
-    plt.vlines(2 * np.pi / max_lambda, ymin, ymax, 'k', linestyles='-.')
-
-    plt.title('1D Power Spectrum')
-    plt.xlabel("k / km^-1")
-    plt.ylabel("$P(k)$")
-    plt.ylim(ymin, ymax)
-    plt.tight_layout()
-    plt.show()
-
-    plt.plot(thetavals, pspec_ang)
-    ax = plt.gca()
-    ax.set_yscale('log')
-    plt.title('Angular power spectrum')
-
-    plt.ylabel("$P(k)$")
-    plt.xlabel(r'$\theta$ (deg)')
-    plt.grid()
-    plt.show()
+    plot_ang_pspec(ang_pspec, theta_vals)
