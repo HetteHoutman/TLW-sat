@@ -64,7 +64,23 @@ def recip_space(Lx, Ly, shape):
     return K, L, dist_array, thetas
 
 
-def filtered_inv_plot(img, filtered_ft, Lx, Ly, latlon=None, inverse_fft=True, wavelength=True):
+def extract_distances(lats, lons):
+    g = pyproj.Geod(ellps='WGS84')
+    _, _, Lx = g.inv(lons[0], lats[lats.shape[0] // 2],
+                     lons[-1], lats[lats.shape[0] // 2])
+    _, _, Ly = g.inv(lons[lons.shape[0] // 2], lats[0],
+                     lons[lons.shape[0] // 2], lats[-1])
+
+    return Lx / 1000, Ly / 1000
+
+
+def create_bins(range, bin_width):
+    bins = np.linspace(range[0], np.ceil(range[1]), int(range[1] / bin_width) + 1)
+    vals = 0.5 * (bins[1:] + bins[:-1])
+    return bins, vals
+
+
+def filtered_inv_plot(img, filtered_ft, Lx, Ly, latlon=None, inverse_fft=True):
     # TODO want to be able to plot lambda instead of k/l
     # TODO plot full shifted_ft, but make colorbar such that values within range are clear
     if inverse_fft:
@@ -102,21 +118,30 @@ def filtered_inv_plot(img, filtered_ft, Lx, Ly, latlon=None, inverse_fft=True, w
     plt.tight_layout()
     plt.show()
 
-    fig2, ax2 = plt.subplots(1, 1)
 
+def plot_2D_pspec(orig, pspec, Lx, Ly, wavelength_contours=None):
+    # TODO change so that orig does not have to be used as arg
+    xlen = orig.shape[1]
+    ylen = orig.shape[0]
+
+    fig2, ax2 = plt.subplots(1, 1)
+    # TODO change to pcolormesh?
     max_k = xlen // 2 * 2 * np.pi / Lx
     max_l = ylen // 2 * 2 * np.pi / Ly
     pixel_k = 2 * max_k / xlen
     pixel_l = 2 * max_l / ylen
     recip_extent = [-max_k - pixel_k / 2, max_k + pixel_k / 2, -max_l - pixel_l / 2, max_l + pixel_l / 2]
 
-    im = ax2.imshow(abs(filtered_ft) ** 2,
+    im = ax2.imshow(pspec.data,
                     extent=recip_extent,
-                    norm='log')
-    if wavelength:
-        K, L, dist_array, thetas = recip_space(Lx, Ly, ft.shape)
+                    interpolation='none',
+                    # norm=mpl.colors.LogNorm(vmin=pspec.min(), vmax=pspec.max())
+                    norm='log', vmin=pspec.min(), vmax=pspec.max())
+
+    if wavelength_contours:
+        K, L, dist_array, thetas = recip_space(Lx, Ly, pspec.shape)
         wavelengths = 2 * np.pi / dist_array
-        con = ax2.contour(K, L, wavelengths, levels=[5, 10], colors=['k'], linestyles=['--'])
+        con = ax2.contour(K, L, wavelengths, levels=wavelength_contours, colors=['k'], linestyles=['--'])
         ax2.clabel(con)
 
     ax2.set_title('2D Power Spectrum')
@@ -124,25 +149,9 @@ def filtered_inv_plot(img, filtered_ft, Lx, Ly, latlon=None, inverse_fft=True, w
     ax2.set_ylabel('l / km^-1')
     ax2.set_xlim(-2, 2)
     ax2.set_ylim(-2, 2)
-    fig2.colorbar(im)
-
+    fig2.colorbar(im, extend='both')
+    plt.tight_layout()
     plt.show()
-
-
-def extract_distances(area_extent):
-    g = pyproj.Geod(ellps='WGS84')
-    _, _, Lx = g.inv(area_extent[0], (area_extent[3] + area_extent[1]) / 2,
-                     area_extent[2], (area_extent[3] + area_extent[1]) / 2)
-    _, _, Ly = g.inv((area_extent[0] + area_extent[2]) / 2, area_extent[1],
-                     (area_extent[0] + area_extent[2]) / 2, area_extent[3])
-
-    return Lx / 1000, Ly / 1000
-
-
-def create_bins(range, bin_width):
-    bins = np.linspace(range[0], np.ceil(range[1]), int(range[1] / bin_width) + 1)
-    vals = 0.5 * (bins[1:] + bins[:-1])
-    return bins, vals
 
 
 def plot_radial_pspec(pspec, vals):
@@ -169,25 +178,39 @@ def plot_radial_pspec(pspec, vals):
     plt.show()
 
 
-def plot_ang_pspec(vals, pspec):
+def plot_ang_pspec(pspec, vals):
     plt.plot(vals, pspec)
     ax = plt.gca()
     ax.set_yscale('log')
     plt.title('Angular power spectrum')
-    plt.ylabel("$P(k)$")
+    plt.ylabel(r"$P(\theta)$")
     plt.xlabel(r'$\theta$ (deg)')
     plt.grid()
     plt.show()
+
+
+def make_stripes(X, Y, wavelength, angle):
+    angle += 90
+    angle = np.deg2rad(angle)
+    return np.sin(2 * np.pi * (X * np.cos(angle) + Y * np.sin(angle)) / wavelength)
 
 
 if __name__ == '__main__':
     filename = 'data/MSG3-SEVI-MSG15-0100-NA-20230419115741.383000000Z-NA/MSG3-SEVI-MSG15-0100-NA-20230419115741.383000000Z-NA.nat'
     area_extent = [-9, 54, -8, 55]
     # area_extent = [-11.5, 49.5, 2, 60]
-    Lx, Ly = extract_distances(area_extent)
     scene, crs = produce_scene(filename, area_extent=area_extent)
-
+    Lx, Ly = extract_distances(scene['HRV'].y[::-1], scene['HRV'].x)
     orig = np.array(scene['HRV'].data)
+
+    x = np.linspace(-Lx / 2, Lx / 2, orig.shape[1])
+    y = np.linspace(-Ly / 2, Ly / 2, orig.shape[0])
+    X, Y = np.meshgrid(x, y)
+    stripe1 = make_stripes(X, Y, 10, 45)
+    stripe2 = make_stripes(X, Y, 5, 135)
+
+    orig = stripe1 + stripe2
+
     ft = np.fft.fft2(orig)
     shifted_ft = np.fft.fftshift(ft)
 
@@ -196,37 +219,36 @@ if __name__ == '__main__':
     max_lambda = 35
     bandpassed = ideal_bandpass(shifted_ft, Lx, Ly, 2 * np.pi / max_lambda, 2 * np.pi / min_lambda)
     filtered_inv_plot(orig, bandpassed, Lx, Ly,
-                      latlon=area_extent,
+                      # latlon=area_extent,
                       inverse_fft=True)
+    pspec_2d = np.ma.masked_where(bandpassed.mask, abs(shifted_ft) ** 2)
+    plot_2D_pspec(orig, pspec_2d, Lx, Ly, wavelength_contours=[5, 10, 35])
     K, L, wavenumbers, thetas = recip_space(Lx, Ly, ft.shape)
 
     # -------- other stuff -------------
-    threshold = abs(bandpassed.compressed()).mean()
-    filtered = low_values_mask(bandpassed, threshold)
-    wavelengths = 2 * np.pi / wavenumbers
-    selec_dists = wavenumbers[~filtered.mask]
-    highest = 115
-    indices = np.argpartition(-abs(filtered.compressed()), highest)[:highest]
-    print(
-        f'Mean wavelength of the highest (most dominant) {highest} wavelengths is: {np.mean(2 * np.pi / selec_dists[indices]):.2f} km')
-    print(f'Average wavelength with fft value above the mean fft value weighted by fft value is '
-          f'{np.average(wavelengths[~filtered.mask], weights=abs(filtered).compressed()):.2f} km')
-
+    # threshold = abs(bandpassed.compressed()).mean()
+    # filtered = low_values_mask(bandpassed, threshold)
+    # wavelengths = 2 * np.pi / wavenumbers
+    # selec_dists = wavenumbers[~filtered.mask]
+    # highest = 115
+    # indices = np.argpartition(-abs(filtered.compressed()), highest)[:highest]
+    # print(
+    #     f'Mean wavelength of the highest (most dominant) {highest} wavelengths is: {np.mean(2 * np.pi / selec_dists[indices]):.2f} km')
+    # print(f'Average wavelength with fft value above the mean fft value weighted by fft value is '
+    #       f'{np.average(wavelengths[~filtered.mask], weights=abs(filtered).compressed()):.2f} km')
 
     # -------- power spectrum ----------
     # TODO check if this is mathematically the right way of calculating pspec
-    amplitudes = abs(shifted_ft) ** 2
     wnum_bin_width = 0.1
     wnum_bins, wnum_vals = create_bins((0, wavenumbers.max()), wnum_bin_width)
-    radial_pspec, _, _ = stats.binned_statistic(wavenumbers.flatten(), amplitudes.flatten(),
+    radial_pspec, _, _ = stats.binned_statistic(wavenumbers.flatten(), pspec_2d.data.flatten(),
                                                 statistic="mean",
                                                 bins=wnum_bins)
     radial_pspec *= np.pi * (wnum_bins[1:] ** 2 - wnum_bins[:-1] ** 2)
 
-    bandpassed_amplitudes = abs(bandpassed) ** 2
     theta_bin_width = 10
     theta_bins, theta_vals = create_bins((0, 180), theta_bin_width)
-    ang_pspec, _, _ = stats.binned_statistic(thetas.flatten(), bandpassed_amplitudes.flatten(),
+    ang_pspec, _, _ = stats.binned_statistic(thetas[~pspec_2d.mask], pspec_2d.compressed(),
                                              statistic="mean",
                                              bins=theta_bins)
     ang_pspec *= np.deg2rad(theta_bin_width) * ((2 * np.pi / min_lambda) ** 2 - (2 * np.pi / max_lambda) ** 2)
