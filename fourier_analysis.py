@@ -225,18 +225,6 @@ if __name__ == '__main__':
     plot_2D_pspec(orig, pspec_2d, Lx, Ly, wavelength_contours=[5, 10, 35])
     K, L, wavenumbers, thetas = recip_space(Lx, Ly, ft.shape)
 
-    # -------- other stuff -------------
-    # threshold = abs(bandpassed.compressed()).mean()
-    # filtered = low_values_mask(bandpassed, threshold)
-    # wavelengths = 2 * np.pi / wavenumbers
-    # selec_dists = wavenumbers[~filtered.mask]
-    # highest = 115
-    # indices = np.argpartition(-abs(filtered.compressed()), highest)[:highest]
-    # print(
-    #     f'Mean wavelength of the highest (most dominant) {highest} wavelengths is: {np.mean(2 * np.pi / selec_dists[indices]):.2f} km')
-    # print(f'Average wavelength with fft value above the mean fft value weighted by fft value is '
-    #       f'{np.average(wavelengths[~filtered.mask], weights=abs(filtered).compressed()):.2f} km')
-
     # -------- power spectrum ----------
     # TODO check if this is mathematically the right way of calculating pspec
     wnum_bin_width = 0.1
