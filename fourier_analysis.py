@@ -76,7 +76,6 @@ def make_radial_pspec(pspec_2d: np.ma.masked_array, wavenumbers, wavenumber_bin_
 
 
 def make_angular_pspec(pspec_2d: np.ma.masked_array, thetas, theta_bin_width, wavelengths, wavelength_ranges):
-    # TODO make so that theta_vals starts at 0
     # TODO change pspec_2d to normal array not masked, as this is not needed
     theta_bins, theta_vals = create_bins((-theta_bin_width/2, 180-theta_bin_width/2), theta_bin_width)
     thetas_redefined = thetas.copy()
@@ -194,6 +193,7 @@ def plot_radial_pspec(pspec_array, vals, theta_ranges):
 
 
 def plot_ang_pspec(pspec_array, vals, wavelength_ranges):
+    plt.rcParams["axes.prop_cycle"] = plt.cycler("color", plt.cm.rainbow(np.linspace(0, 1, len(pspec_array))))
     for i, pspec in enumerate(pspec_array):
         plt.plot(vals, pspec, label=f'{wavelength_ranges[i]} km' + r'$ \leq \lambda < $' + f'{wavelength_ranges[i + 1]} km')
 
@@ -227,7 +227,7 @@ if __name__ == '__main__':
     stripe1 = make_stripes(X, Y, 10, 15)
     stripe2 = make_stripes(X, Y, 5, 135)
 
-    orig = stripe1 + stripe2
+    # orig = stripe1 + stripe2
 
     ft = np.fft.fft2(orig)
     shifted_ft = np.fft.fftshift(ft)
@@ -239,15 +239,15 @@ if __name__ == '__main__':
     filtered_inv_plot(orig, bandpassed, Lx, Ly,
                       # latlon=area_extent,
                       inverse_fft=True)
+
+    # TODO check if this is mathematically the right way of calculating pspec
     pspec_2d = np.ma.masked_where(bandpassed.mask, abs(shifted_ft) ** 2)
     plot_2D_pspec(pspec_2d, Lx, Ly, wavelength_contours=[5, 10, 35])
     K, L, wavenumbers, thetas = recip_space(Lx, Ly, ft.shape)
     wavelengths = 2 * np.pi / wavenumbers
 
-    # -------- power spectrum ----------
-    # TODO check if this is mathematically the right way of calculating pspec
     wnum_bin_width = 0.1
-    theta_bin_width = 30
+    theta_bin_width = 15
     radial_pspec_array, wnum_vals, theta_ranges = make_radial_pspec(pspec_2d, wavenumbers, wnum_bin_width,
                                                                     thetas, theta_bin_width)
 
