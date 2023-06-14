@@ -11,27 +11,6 @@ from file_to_image import produce_scene
 # filename = 'data/MSG3-SEVI-MSG15-0100-NA-20150414124241.311000000Z-NA/MSG3-SEVI-MSG15-0100-NA-20150414124241' \
 #            '.311000000Z-NA.nat'
 
-def low_values_masked_plot():
-    global fig, axes, temp
-    fig, axes = plt.subplots(1, 2)
-    temp = shifted_ft.copy()
-    temp[temp < 100] = 1
-    axes[0].imshow(abs(temp), norm='log')
-    axes[1].imshow(abs(np.fft.ifft2(temp)), cmap='gray')
-    plt.show()
-
-
-def middle_line_masked_plot():
-    global fig, axes, temp
-    fig, axes = plt.subplots(1, 2)
-    temp = shifted_ft.copy()
-    temp[:, temp.shape[1] // 2] = 1
-    # temp[temp.shape[0] // 2] = 1
-    axes[0].imshow(abs(temp), norm='log')
-    axes[1].imshow(abs(np.fft.ifft2(temp)), cmap='gray')
-    plt.show()
-
-
 def ideal_bandpass(ft, Lx, Ly, low, high):
     _, _, dist_array, thetas = recip_space(Lx, Ly, ft.shape)
 
@@ -39,11 +18,6 @@ def ideal_bandpass(ft, Lx, Ly, low, high):
     high_mask = (dist_array > high)
     masked = np.ma.masked_where(low_mask | high_mask, ft)
 
-    return masked
-
-
-def low_values_mask(ft, threshold):
-    masked = np.ma.masked_where(abs(ft) < threshold, ft)
     return masked
 
 
@@ -80,8 +54,25 @@ def create_bins(range, bin_width):
     return bins, vals
 
 
-def filtered_inv_plot(img, filtered_ft, Lx, Ly, latlon=None, inverse_fft=True):
+def make_radial_pspec(pspec_2d, wavenumbers, wavenumber_bin_width, thetas, theta_bin_width):
+    wnum_bins, wnum_vals = create_bins((0, wavenumbers.max()), wavenumber_bin_width)
+    theta_ranges, _ = create_bins((0, 180), theta_bin_width)
+    radial_pspec_array = []
 
+    for i in range(len(theta_ranges) - 1):
+        low_mask = thetas >= theta_ranges[i]
+        high_mask = thetas < theta_ranges[i + 1]
+        mask = (low_mask & high_mask)
+        radial_pspec, _, _ = stats.binned_statistic(wavenumbers[mask].flatten(), pspec_2d.data[mask].flatten(),
+                                                    statistic="mean",
+                                                    bins=wnum_bins)
+        radial_pspec *= np.pi * (wnum_bins[1:] ** 2 - wnum_bins[:-1] ** 2) * np.deg2rad(theta_bin_width)
+        radial_pspec_array.append(radial_pspec)
+
+    return radial_pspec_array, wnum_vals, theta_ranges
+
+
+def filtered_inv_plot(img, filtered_ft, Lx, Ly, latlon=None, inverse_fft=True):
     if inverse_fft:
         fig, (ax1, ax3) = plt.subplots(1, 2, sharey=True)
     else:
@@ -149,15 +140,17 @@ def plot_2D_pspec(pspec, Lx, Ly, wavelength_contours=None):
     plt.show()
 
 
-def plot_radial_pspec(pspec, vals):
-    plt.loglog(vals, pspec)
+def plot_radial_pspec(pspec_array, vals, theta_ranges):
+    plt.rcParams["axes.prop_cycle"] = plt.cycler("color", plt.cm.rainbow(np.linspace(0, 1, len(pspec_array))))
+    for i, pspec in enumerate(pspec_array):
+        plt.loglog(vals, pspec, label=f'{theta_ranges[i]}' + r'$ < \theta < $' + f'{theta_ranges[i + 1]}')
 
     xlen = orig.shape[1]
     ylen = orig.shape[0]
     pixel_x = Lx / xlen
     pixel_y = Ly / ylen
-    ymin = np.nanmin(radial_pspec)
-    ymax = np.nanmax(radial_pspec)
+    ymin = 1
+    ymax = np.nanmax(np.array(pspec_array))
 
     plt.vlines(2 * np.pi / 8, ymin, ymax, 'k', linestyles='--')
     plt.vlines(2 * np.pi / min(Lx, Ly), ymin, ymax, 'k', linestyles='dotted')
@@ -169,12 +162,15 @@ def plot_radial_pspec(pspec, vals):
     plt.xlabel("k / km^-1")
     plt.ylabel("$P(k)$")
     plt.ylim(ymin, ymax)
+    plt.legend()
     plt.tight_layout()
     plt.show()
 
 
 def plot_ang_pspec(pspec, vals):
+
     plt.plot(vals, pspec)
+
     ax = plt.gca()
     ax.set_yscale('log')
     plt.title('Angular power spectrum')
@@ -223,19 +219,16 @@ if __name__ == '__main__':
     # -------- power spectrum ----------
     # TODO check if this is mathematically the right way of calculating pspec
     wnum_bin_width = 0.1
-    wnum_bins, wnum_vals = create_bins((0, wavenumbers.max()), wnum_bin_width)
-    radial_pspec, _, _ = stats.binned_statistic(wavenumbers.flatten(), pspec_2d.data.flatten(),
-                                                statistic="mean",
-                                                bins=wnum_bins)
-    radial_pspec *= np.pi * (wnum_bins[1:] ** 2 - wnum_bins[:-1] ** 2)
+    radial_pspec_array, wnum_vals, theta_ranges = make_radial_pspec(pspec_2d, wavenumbers, wnum_bin_width, thetas, 22.5)
 
     theta_bin_width = 10
+    # TODO make so that theta_vals starts at 0
     theta_bins, theta_vals = create_bins((0, 180), theta_bin_width)
     ang_pspec, _, _ = stats.binned_statistic(thetas[~pspec_2d.mask], pspec_2d.compressed(),
                                              statistic="mean",
                                              bins=theta_bins)
     ang_pspec *= np.deg2rad(theta_bin_width) * ((2 * np.pi / min_lambda) ** 2 - (2 * np.pi / max_lambda) ** 2)
 
-    plot_radial_pspec(radial_pspec, wnum_vals)
+    plot_radial_pspec(radial_pspec_array, wnum_vals, theta_ranges)
 
     plot_ang_pspec(ang_pspec, theta_vals)
