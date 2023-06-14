@@ -49,20 +49,23 @@ def extract_distances(lats, lons):
 
 
 def create_bins(range, bin_width):
-    bins = np.linspace(range[0], np.ceil(range[1]), int(range[1] / bin_width) + 1)
+    bins = np.linspace(range[0], range[1], int(np.ceil(range[1] / bin_width) + 1))
     vals = 0.5 * (bins[1:] + bins[:-1])
     return bins, vals
 
 
 def make_radial_pspec(pspec_2d: np.ma.masked_array, wavenumbers, wavenumber_bin_width, thetas, theta_bin_width):
     wnum_bins, wnum_vals = create_bins((0, wavenumbers.max()), wavenumber_bin_width)
-    theta_ranges, _ = create_bins((0, 180), theta_bin_width)
+    theta_ranges, _ = create_bins((-theta_bin_width/2, 180-theta_bin_width/2), theta_bin_width)
+    thetas_redefined = thetas.copy()
+    thetas_redefined[(180 - theta_bin_width / 2 <= thetas_redefined) & (thetas_redefined < 180)] -= 180
     radial_pspec_array = []
 
     for i in range(len(theta_ranges) - 1):
-        low_mask = thetas >= theta_ranges[i]
-        high_mask = thetas < theta_ranges[i + 1]
+        low_mask = thetas_redefined >= theta_ranges[i]
+        high_mask = thetas_redefined < theta_ranges[i + 1]
         mask = (low_mask & high_mask)
+
         radial_pspec, _, _ = stats.binned_statistic(wavenumbers[mask].flatten(), pspec_2d.data[mask].flatten(),
                                                     statistic="mean",
                                                     bins=wnum_bins)
@@ -74,15 +77,17 @@ def make_radial_pspec(pspec_2d: np.ma.masked_array, wavenumbers, wavenumber_bin_
 
 def make_angular_pspec(pspec_2d: np.ma.masked_array, thetas, theta_bin_width, wavelengths, wavelength_ranges):
     # TODO make so that theta_vals starts at 0
-    theta_bins, theta_vals = create_bins((0, 180), theta_bin_width)
+    # TODO change pspec_2d to normal array not masked, as this is not needed
+    theta_bins, theta_vals = create_bins((-theta_bin_width/2, 180-theta_bin_width/2), theta_bin_width)
+    thetas_redefined = thetas.copy()
+    thetas_redefined[(180 - theta_bin_width/2 <= thetas_redefined) & (thetas_redefined < 180)] -= 180
     ang_pspec_array = []
-
     for i in range(len(wavelength_ranges) - 1):
         low_mask = wavelengths >= wavelength_ranges[i]
         high_mask = wavelengths < wavelength_ranges[i + 1]
         mask = (low_mask & high_mask)
 
-        ang_pspec, _, _ = stats.binned_statistic(thetas[mask].flatten(), pspec_2d.data[mask].flatten(),
+        ang_pspec, _, _ = stats.binned_statistic(thetas_redefined[mask].flatten(), pspec_2d.data[mask].flatten(),
                                                  statistic="mean",
                                                  bins=theta_bins)
         ang_pspec *= np.deg2rad(theta_bin_width) * (
@@ -130,9 +135,9 @@ def filtered_inv_plot(img, filtered_ft, Lx, Ly, latlon=None, inverse_fft=True):
     plt.show()
 
 
-def plot_2D_pspec(pspec, Lx, Ly, wavelength_contours=None):
-    xlen = pspec.shape[1]
-    ylen = pspec.shape[0]
+def plot_2D_pspec(bandpassed_pspec, Lx, Ly, wavelength_contours=None):
+    xlen = bandpassed_pspec.shape[1]
+    ylen = bandpassed_pspec.shape[0]
 
     fig2, ax2 = plt.subplots(1, 1)
     # TODO change to pcolormesh?
@@ -142,11 +147,11 @@ def plot_2D_pspec(pspec, Lx, Ly, wavelength_contours=None):
     pixel_l = 2 * max_l / ylen
     recip_extent = [-max_k - pixel_k / 2, max_k + pixel_k / 2, -max_l - pixel_l / 2, max_l + pixel_l / 2]
 
-    im = ax2.imshow(pspec.data, extent=recip_extent, interpolation='none',
-                    norm='log', vmin=pspec.min(), vmax=pspec.max())
+    im = ax2.imshow(bandpassed_pspec.data, extent=recip_extent, interpolation='none',
+                    norm='log', vmin=bandpassed_pspec.min(), vmax=bandpassed_pspec.max())
 
     if wavelength_contours:
-        K, L, dist_array, thetas = recip_space(Lx, Ly, pspec.shape)
+        K, L, dist_array, thetas = recip_space(Lx, Ly, bandpassed_pspec.shape)
         wavelengths = 2 * np.pi / dist_array
         con = ax2.contour(K, L, wavelengths, levels=wavelength_contours, colors=['k'], linestyles=['--'])
         ax2.clabel(con)
@@ -219,10 +224,10 @@ if __name__ == '__main__':
     x = np.linspace(-Lx / 2, Lx / 2, orig.shape[1])
     y = np.linspace(-Ly / 2, Ly / 2, orig.shape[0])
     X, Y = np.meshgrid(x, y)
-    stripe1 = make_stripes(X, Y, 10, 45)
+    stripe1 = make_stripes(X, Y, 10, 15)
     stripe2 = make_stripes(X, Y, 5, 135)
 
-    # orig = stripe1 + stripe2
+    orig = stripe1 + stripe2
 
     ft = np.fft.fft2(orig)
     shifted_ft = np.fft.fftshift(ft)
@@ -242,11 +247,12 @@ if __name__ == '__main__':
     # -------- power spectrum ----------
     # TODO check if this is mathematically the right way of calculating pspec
     wnum_bin_width = 0.1
-    radial_pspec_array, wnum_vals, theta_ranges = make_radial_pspec(pspec_2d, wavenumbers, wnum_bin_width, thetas, 22.5)
+    theta_bin_width = 30
+    radial_pspec_array, wnum_vals, theta_ranges = make_radial_pspec(pspec_2d, wavenumbers, wnum_bin_width,
+                                                                    thetas, theta_bin_width)
 
     plot_radial_pspec(radial_pspec_array, wnum_vals, theta_ranges)
 
-    theta_bin_width = 10
     wavelength_ranges = [1, 4, 6, 8, 10, 12, 15, 20, 35]
     ang_pspec_array, theta_vals = make_angular_pspec(pspec_2d, thetas, theta_bin_width, wavelengths, wavelength_ranges)
 
