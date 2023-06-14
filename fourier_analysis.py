@@ -215,8 +215,8 @@ def make_stripes(X, Y, wavelength, angle):
 
 if __name__ == '__main__':
     filename = 'data/MSG3-SEVI-MSG15-0100-NA-20230419115741.383000000Z-NA/MSG3-SEVI-MSG15-0100-NA-20230419115741.383000000Z-NA.nat'
-    area_extent = [-9, 54, -8, 55]
-    # area_extent = [-11.5, 49.5, 2, 60]
+    # area_extent = [-9, 54, -8, 55]
+    area_extent = [-11.5, 49.5, 2, 60]
     scene, crs = produce_scene(filename, area_extent=area_extent)
     Lx, Ly = extract_distances(scene['HRV'].y[::-1], scene['HRV'].x)
     orig = np.array(scene['HRV'].data)
@@ -257,3 +257,7 @@ if __name__ == '__main__':
     ang_pspec_array, theta_vals = make_angular_pspec(pspec_2d, thetas, theta_bin_width, wavelengths, wavelength_ranges)
 
     plot_ang_pspec(ang_pspec_array, theta_vals, wavelength_ranges)
+    # TODO plot a sort of 2d binned version of the above two plots in a 3d plot, then search for maxima (like Belinchon et al.)? although the search does not have to be performed in that space, of course.
+    print('Quite remarkable that it seems to work for the entire image. Is this concidence? I dont think so, esecially if'
+          'you look at the bandpassed image. Can probably get away with smaller wavelength ranges in ang_pspec plot!'
+          'Should test it on a case without TLWs and see how that looks')
