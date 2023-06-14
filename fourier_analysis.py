@@ -54,7 +54,7 @@ def create_bins(range, bin_width):
     return bins, vals
 
 
-def make_radial_pspec(pspec_2d, wavenumbers, wavenumber_bin_width, thetas, theta_bin_width):
+def make_radial_pspec(pspec_2d: np.ma.masked_array, wavenumbers, wavenumber_bin_width, thetas, theta_bin_width):
     wnum_bins, wnum_vals = create_bins((0, wavenumbers.max()), wavenumber_bin_width)
     theta_ranges, _ = create_bins((0, 180), theta_bin_width)
     radial_pspec_array = []
@@ -70,6 +70,27 @@ def make_radial_pspec(pspec_2d, wavenumbers, wavenumber_bin_width, thetas, theta
         radial_pspec_array.append(radial_pspec)
 
     return radial_pspec_array, wnum_vals, theta_ranges
+
+
+def make_angular_pspec(pspec_2d: np.ma.masked_array, thetas, theta_bin_width, wavelengths, wavelength_ranges):
+    # TODO make so that theta_vals starts at 0
+    theta_bins, theta_vals = create_bins((0, 180), theta_bin_width)
+    ang_pspec_array = []
+
+    for i in range(len(wavelength_ranges) - 1):
+        low_mask = wavelengths >= wavelength_ranges[i]
+        high_mask = wavelengths < wavelength_ranges[i + 1]
+        mask = (low_mask & high_mask)
+
+        ang_pspec, _, _ = stats.binned_statistic(thetas[mask].flatten(), pspec_2d.data[mask].flatten(),
+                                                 statistic="mean",
+                                                 bins=theta_bins)
+        ang_pspec *= np.deg2rad(theta_bin_width) * (
+                (2 * np.pi / wavelength_ranges[i]) ** 2 - (2 * np.pi / wavelength_ranges[i + 1]) ** 2
+        )
+        ang_pspec_array.append(ang_pspec)
+
+    return ang_pspec_array, theta_vals
 
 
 def filtered_inv_plot(img, filtered_ft, Lx, Ly, latlon=None, inverse_fft=True):
@@ -143,7 +164,7 @@ def plot_2D_pspec(pspec, Lx, Ly, wavelength_contours=None):
 def plot_radial_pspec(pspec_array, vals, theta_ranges):
     plt.rcParams["axes.prop_cycle"] = plt.cycler("color", plt.cm.rainbow(np.linspace(0, 1, len(pspec_array))))
     for i, pspec in enumerate(pspec_array):
-        plt.loglog(vals, pspec, label=f'{theta_ranges[i]}' + r'$ < \theta < $' + f'{theta_ranges[i + 1]}')
+        plt.loglog(vals, pspec, label=f'{theta_ranges[i]}' + r'$ \leq \theta < $' + f'{theta_ranges[i + 1]}')
 
     xlen = orig.shape[1]
     ylen = orig.shape[0]
@@ -167,15 +188,16 @@ def plot_radial_pspec(pspec_array, vals, theta_ranges):
     plt.show()
 
 
-def plot_ang_pspec(pspec, vals):
-
-    plt.plot(vals, pspec)
+def plot_ang_pspec(pspec_array, vals, wavelength_ranges):
+    for i, pspec in enumerate(pspec_array):
+        plt.plot(vals, pspec, label=f'{wavelength_ranges[i]} km' + r'$ \leq \lambda < $' + f'{wavelength_ranges[i + 1]} km')
 
     ax = plt.gca()
     ax.set_yscale('log')
     plt.title('Angular power spectrum')
     plt.ylabel(r"$P(\theta)$")
     plt.xlabel(r'$\theta$ (deg)')
+    plt.legend(loc='lower left')
     plt.grid()
     plt.show()
 
@@ -200,7 +222,7 @@ if __name__ == '__main__':
     stripe1 = make_stripes(X, Y, 10, 45)
     stripe2 = make_stripes(X, Y, 5, 135)
 
-    orig = stripe1 + stripe2
+    # orig = stripe1 + stripe2
 
     ft = np.fft.fft2(orig)
     shifted_ft = np.fft.fftshift(ft)
@@ -215,20 +237,17 @@ if __name__ == '__main__':
     pspec_2d = np.ma.masked_where(bandpassed.mask, abs(shifted_ft) ** 2)
     plot_2D_pspec(pspec_2d, Lx, Ly, wavelength_contours=[5, 10, 35])
     K, L, wavenumbers, thetas = recip_space(Lx, Ly, ft.shape)
+    wavelengths = 2 * np.pi / wavenumbers
 
     # -------- power spectrum ----------
     # TODO check if this is mathematically the right way of calculating pspec
     wnum_bin_width = 0.1
     radial_pspec_array, wnum_vals, theta_ranges = make_radial_pspec(pspec_2d, wavenumbers, wnum_bin_width, thetas, 22.5)
 
-    theta_bin_width = 10
-    # TODO make so that theta_vals starts at 0
-    theta_bins, theta_vals = create_bins((0, 180), theta_bin_width)
-    ang_pspec, _, _ = stats.binned_statistic(thetas[~pspec_2d.mask], pspec_2d.compressed(),
-                                             statistic="mean",
-                                             bins=theta_bins)
-    ang_pspec *= np.deg2rad(theta_bin_width) * ((2 * np.pi / min_lambda) ** 2 - (2 * np.pi / max_lambda) ** 2)
-
     plot_radial_pspec(radial_pspec_array, wnum_vals, theta_ranges)
 
-    plot_ang_pspec(ang_pspec, theta_vals)
+    theta_bin_width = 10
+    wavelength_ranges = [1, 4, 6, 8, 10, 12, 15, 20, 35]
+    ang_pspec_array, theta_vals = make_angular_pspec(pspec_2d, thetas, theta_bin_width, wavelengths, wavelength_ranges)
+
+    plot_ang_pspec(ang_pspec_array, theta_vals, wavelength_ranges)
