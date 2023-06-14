@@ -81,8 +81,7 @@ def create_bins(range, bin_width):
 
 
 def filtered_inv_plot(img, filtered_ft, Lx, Ly, latlon=None, inverse_fft=True):
-    # TODO want to be able to plot lambda instead of k/l
-    # TODO plot full shifted_ft, but make colorbar such that values within range are clear
+
     if inverse_fft:
         fig, (ax1, ax3) = plt.subplots(1, 2, sharey=True)
     else:
@@ -119,10 +118,9 @@ def filtered_inv_plot(img, filtered_ft, Lx, Ly, latlon=None, inverse_fft=True):
     plt.show()
 
 
-def plot_2D_pspec(orig, pspec, Lx, Ly, wavelength_contours=None):
-    # TODO change so that orig does not have to be used as arg
-    xlen = orig.shape[1]
-    ylen = orig.shape[0]
+def plot_2D_pspec(pspec, Lx, Ly, wavelength_contours=None):
+    xlen = pspec.shape[1]
+    ylen = pspec.shape[0]
 
     fig2, ax2 = plt.subplots(1, 1)
     # TODO change to pcolormesh?
@@ -132,10 +130,7 @@ def plot_2D_pspec(orig, pspec, Lx, Ly, wavelength_contours=None):
     pixel_l = 2 * max_l / ylen
     recip_extent = [-max_k - pixel_k / 2, max_k + pixel_k / 2, -max_l - pixel_l / 2, max_l + pixel_l / 2]
 
-    im = ax2.imshow(pspec.data,
-                    extent=recip_extent,
-                    interpolation='none',
-                    # norm=mpl.colors.LogNorm(vmin=pspec.min(), vmax=pspec.max())
+    im = ax2.imshow(pspec.data, extent=recip_extent, interpolation='none',
                     norm='log', vmin=pspec.min(), vmax=pspec.max())
 
     if wavelength_contours:
@@ -222,7 +217,7 @@ if __name__ == '__main__':
                       # latlon=area_extent,
                       inverse_fft=True)
     pspec_2d = np.ma.masked_where(bandpassed.mask, abs(shifted_ft) ** 2)
-    plot_2D_pspec(orig, pspec_2d, Lx, Ly, wavelength_contours=[5, 10, 35])
+    plot_2D_pspec(pspec_2d, Lx, Ly, wavelength_contours=[5, 10, 35])
     K, L, wavenumbers, thetas = recip_space(Lx, Ly, ft.shape)
 
     # -------- power spectrum ----------
