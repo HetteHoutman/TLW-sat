@@ -174,12 +174,12 @@ def plot_radial_pspec(pspec_array, vals, theta_ranges):
     ylen = orig.shape[0]
     pixel_x = Lx / xlen
     pixel_y = Ly / ylen
-    ymin = 1
+    ymin = np.nanmin(np.array(pspec_array))
     ymax = np.nanmax(np.array(pspec_array))
 
     plt.vlines(2 * np.pi / 8, ymin, ymax, 'k', linestyles='--')
-    plt.vlines(2 * np.pi / min(Lx, Ly), ymin, ymax, 'k', linestyles='dotted')
-    plt.vlines(np.pi / max(pixel_y, pixel_x), ymin, ymax, 'k', linestyles='dotted')
+    # plt.vlines(2 * np.pi / min(Lx, Ly), ymin, ymax, 'k', linestyles='dotted')
+    # plt.vlines(np.pi / max(pixel_y, pixel_x), ymin, ymax, 'k', linestyles='dotted')
     plt.vlines(2 * np.pi / min_lambda, ymin, ymax, 'k', linestyles='-.')
     plt.vlines(2 * np.pi / max_lambda, ymin, ymax, 'k', linestyles='-.')
 
@@ -187,7 +187,7 @@ def plot_radial_pspec(pspec_array, vals, theta_ranges):
     plt.xlabel("k / km^-1")
     plt.ylabel("$P(k)$")
     plt.ylim(ymin, ymax)
-    plt.legend()
+    plt.legend(loc='lower left')
     plt.tight_layout()
     plt.show()
 
@@ -258,6 +258,6 @@ if __name__ == '__main__':
 
     plot_ang_pspec(ang_pspec_array, theta_vals, wavelength_ranges)
     # TODO plot a sort of 2d binned version of the above two plots in a 3d plot, then search for maxima (like Belinchon et al.)? although the search does not have to be performed in that space, of course.
-    print('Quite remarkable that it seems to work for the entire image. Is this concidence? I dont think so, esecially if'
-          'you look at the bandpassed image. Can probably get away with smaller wavelength ranges in ang_pspec plot!'
+    print('Quite remarkable that it seems to work for the entire image. Is this concidence? I dont think so, esecially if \n'
+          'you look at the bandpassed image. Can probably get away with smaller wavelength ranges in ang_pspec plot! \n'
           'Should test it on a case without TLWs and see how that looks')
