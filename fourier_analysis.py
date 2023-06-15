@@ -215,8 +215,8 @@ def make_stripes(X, Y, wavelength, angle):
 
 if __name__ == '__main__':
     filename = 'data/MSG3-SEVI-MSG15-0100-NA-20230419115741.383000000Z-NA/MSG3-SEVI-MSG15-0100-NA-20230419115741.383000000Z-NA.nat'
-    # area_extent = [-9, 54, -8, 55]
-    area_extent = [-11.5, 49.5, 2, 60]
+    area_extent = [-9, 54, -8, 55]
+    # area_extent = [-11.5, 49.5, 2, 60]
     scene, crs = produce_scene(filename, area_extent=area_extent)
     Lx, Ly = extract_distances(scene['HRV'].y[::-1], scene['HRV'].x)
     orig = np.array(scene['HRV'].data)
@@ -261,3 +261,4 @@ if __name__ == '__main__':
     print('Quite remarkable that it seems to work for the entire image. Is this concidence? I dont think so, esecially if \n'
           'you look at the bandpassed image. Can probably get away with smaller wavelength ranges in ang_pspec plot! \n'
           'Should test it on a case without TLWs and see how that looks')
+    # TODO change coordinates to polar and plot pspec_2d that way? might be clearer, but cant figure out how to convert....
