@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pyproj
+import scipy.interpolate
 from scipy import stats
 
 from file_to_image import produce_scene
@@ -262,3 +263,19 @@ if __name__ == '__main__':
           'you look at the bandpassed image. Can probably get away with smaller wavelength ranges in ang_pspec plot! \n'
           'Should test it on a case without TLWs and see how that looks')
     # TODO change coordinates to polar and plot pspec_2d that way? might be clearer, but cant figure out how to convert....
+
+    # bs below
+    thetas = -np.rad2deg(np.arctan2(K, L)) + 180
+    wavenumber_gridp = np.arange(0.3, 2, 0.1)
+    theta_gridp = np.linspace(0, 360, 100)
+    henk = np.meshgrid(wavenumber_gridp, theta_gridp)
+    points = np.array([[k, l] for k, l in zip(wavenumbers.flatten(), thetas.flatten())])
+    xi = np.array([[w, t] for w, t in zip(henk[0].flatten(), henk[1].flatten())])
+    values = pspec_2d.flatten()
+    interp_values = scipy.interpolate.griddata(points, values.data, xi)
+    grid = xi.reshape(henk[0].shape[0], henk[0].shape[1], 2)
+    con = plt.contourf(grid[:, :, 0], grid[:, :, 1], interp_values.reshape(henk[0].shape), norm='log')
+    plt.colorbar(con)
+    plt.show()
+
+
