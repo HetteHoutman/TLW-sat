@@ -1,7 +1,11 @@
+import sys
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pyproj
 import scipy.interpolate
+from matplotlib import ticker, colors
+from miscellaneous import check_argv_num, load_settings
 from scipy import stats
 
 from file_to_image import produce_scene
@@ -57,7 +61,7 @@ def create_bins(range, bin_width):
 
 def make_radial_pspec(pspec_2d: np.ma.masked_array, wavenumbers, wavenumber_bin_width, thetas, theta_bin_width):
     wnum_bins, wnum_vals = create_bins((0, wavenumbers.max()), wavenumber_bin_width)
-    theta_ranges, _ = create_bins((-theta_bin_width/2, 180-theta_bin_width/2), theta_bin_width)
+    theta_ranges, _ = create_bins((-theta_bin_width / 2, 180 - theta_bin_width / 2), theta_bin_width)
     thetas_redefined = thetas.copy()
     thetas_redefined[(180 - theta_bin_width / 2 <= thetas_redefined) & (thetas_redefined < 180)] -= 180
     radial_pspec_array = []
@@ -78,9 +82,9 @@ def make_radial_pspec(pspec_2d: np.ma.masked_array, wavenumbers, wavenumber_bin_
 
 def make_angular_pspec(pspec_2d: np.ma.masked_array, thetas, theta_bin_width, wavelengths, wavelength_ranges):
     # TODO change pspec_2d to normal array not masked, as this is not needed
-    theta_bins, theta_vals = create_bins((-theta_bin_width/2, 180-theta_bin_width/2), theta_bin_width)
+    theta_bins, theta_vals = create_bins((-theta_bin_width / 2, 180 - theta_bin_width / 2), theta_bin_width)
     thetas_redefined = thetas.copy()
-    thetas_redefined[(180 - theta_bin_width/2 <= thetas_redefined) & (thetas_redefined < 180)] -= 180
+    thetas_redefined[(180 - theta_bin_width / 2 <= thetas_redefined) & (thetas_redefined < 180)] -= 180
     ang_pspec_array = []
     for i in range(len(wavelength_ranges) - 1):
         low_mask = wavelengths >= wavelength_ranges[i]
@@ -132,6 +136,7 @@ def filtered_inv_plot(img, filtered_ft, Lx, Ly, latlon=None, inverse_fft=True):
                    cmap='gray')
     # save?
     plt.tight_layout()
+    plt.savefig('plots/sat_plot.png', dpi=300)
     plt.show()
 
 
@@ -157,12 +162,13 @@ def plot_2D_pspec(bandpassed_pspec, Lx, Ly, wavelength_contours=None):
         ax2.clabel(con)
 
     ax2.set_title('2D Power Spectrum')
-    ax2.set_xlabel('k / km^-1')
-    ax2.set_ylabel('l / km^-1')
+    ax2.set_xlabel(r"$k_x$" + ' / ' + r"$\rm{km}^{-1}$")
+    ax2.set_ylabel(r"$k_y$" + ' / ' + r"$\rm{km}^{-1}$")
     ax2.set_xlim(-2, 2)
     ax2.set_ylim(-2, 2)
     fig2.colorbar(im, extend='both')
     plt.tight_layout()
+    plt.savefig('plots/2d_pspec.png', dpi=300)
     plt.show()
 
 
@@ -185,18 +191,20 @@ def plot_radial_pspec(pspec_array, vals, theta_ranges):
     plt.vlines(2 * np.pi / max_lambda, ymin, ymax, 'k', linestyles='-.')
 
     plt.title('1D Power Spectrum')
-    plt.xlabel("k / km^-1")
-    plt.ylabel("$P(k)$")
+    plt.xlabel(r"$|\mathbf{k}|$" + ' / ' + r"$\rm{km}^{-1}$")
+    plt.ylabel(r"$P(|\mathbf{k}|)$")
     plt.ylim(ymin, ymax)
     plt.legend(loc='lower left')
     plt.tight_layout()
+    plt.savefig('plots/radial_pspec.png', dpi=300)
     plt.show()
 
 
 def plot_ang_pspec(pspec_array, vals, wavelength_ranges):
     plt.rcParams["axes.prop_cycle"] = plt.cycler("color", plt.cm.rainbow(np.linspace(0, 1, len(pspec_array))))
     for i, pspec in enumerate(pspec_array):
-        plt.plot(vals, pspec, label=f'{wavelength_ranges[i]} km' + r'$ \leq \lambda < $' + f'{wavelength_ranges[i + 1]} km')
+        plt.plot(vals, pspec,
+                 label=f'{wavelength_ranges[i]} km' + r'$ \leq \lambda < $' + f'{wavelength_ranges[i + 1]} km')
 
     ax = plt.gca()
     ax.set_yscale('log')
@@ -215,9 +223,17 @@ def make_stripes(X, Y, wavelength, angle):
 
 
 if __name__ == '__main__':
-    filename = 'data/MSG3-SEVI-MSG15-0100-NA-20230419115741.383000000Z-NA/MSG3-SEVI-MSG15-0100-NA-20230419115741.383000000Z-NA.nat'
-    area_extent = [-9, 54, -8, 55]
+    # check_argv_num(sys.argv, 1, "(settings json file)")
+    # s = load_settings(sys.argv[1])
+    filename = 'data/MSG3-SEVI-MSG15-0100-NA-20230419121241.367000000Z-NA/MSG3-SEVI-MSG15-0100-NA-20230419121241.367000000Z-NA.nat'
+    # filename = s.sat_file
+    # small area
+    # area_extent = [-9, 54, -8, 55]
+    # entire uk
     # area_extent = [-11.5, 49.5, 2, 60]
+    # ireland
+    area_extent = [-11, 51, -5, 55.5]
+    # area_extent = [*s.map_bottomleft, *s.map_topright]
     scene, crs = produce_scene(filename, area_extent=area_extent)
     Lx, Ly = extract_distances(scene['HRV'].y[::-1], scene['HRV'].x)
     orig = np.array(scene['HRV'].data)
@@ -259,23 +275,37 @@ if __name__ == '__main__':
 
     plot_ang_pspec(ang_pspec_array, theta_vals, wavelength_ranges)
     # TODO plot a sort of 2d binned version of the above two plots in a 3d plot, then search for maxima (like Belinchon et al.)? although the search does not have to be performed in that space, of course.
-    print('Quite remarkable that it seems to work for the entire image. Is this concidence? I dont think so, esecially if \n'
-          'you look at the bandpassed image. Can probably get away with smaller wavelength ranges in ang_pspec plot! \n'
-          'Should test it on a case without TLWs and see how that looks')
+    print(
+        'Quite remarkable that it seems to work for the entire image. Is this concidence? I dont think so, esecially if \n'
+        'you look at the bandpassed image. Can probably get away with smaller wavelength ranges in ang_pspec plot! \n'
+        'Should test it on a case without TLWs and see how that looks')
     # TODO change coordinates to polar and plot pspec_2d that way? might be clearer, but cant figure out how to convert....
 
     # bs below
-    thetas = -np.rad2deg(np.arctan2(K, L)) + 180
-    wavenumber_gridp = np.arange(0.3, 2, 0.1)
-    theta_gridp = np.linspace(0, 360, 100)
+    # thetas = -np.rad2deg(np.arctan2(K, L)) + 180
+    theta_bins, theta_gridp = create_bins((0, 180), 5)
+    wnum_bins, wavenumber_gridp = create_bins((0.2, 2), 0.05)
+    # wavenumber_gridp = np.arange(0.3, 2, 0.05)
+    # theta_gridp = np.linspace(0, 360, 50)
     henk = np.meshgrid(wavenumber_gridp, theta_gridp)
     points = np.array([[k, l] for k, l in zip(wavenumbers.flatten(), thetas.flatten())])
     xi = np.array([[w, t] for w, t in zip(henk[0].flatten(), henk[1].flatten())])
-    values = pspec_2d.flatten()
-    interp_values = scipy.interpolate.griddata(points, values.data, xi)
+    values = pspec_2d.data.flatten()
+    interp_values = scipy.interpolate.griddata(points, values.data, xi, method='linear')
     grid = xi.reshape(henk[0].shape[0], henk[0].shape[1], 2)
-    con = plt.contourf(grid[:, :, 0], grid[:, :, 1], interp_values.reshape(henk[0].shape), norm='log')
-    plt.colorbar(con)
+    # lev_exp = np.arange(np.floor(np.log10(pspec_2d.min()) - 1),
+    #                                        np.ceil(np.log10(pspec_2d.max())+1))
+    # levs = np.power(10, lev_exp)
+    con = plt.contourf(grid[:, :, 0], grid[:, :, 1], interp_values.reshape(henk[0].shape),
+                       # levs,
+                       # vmin=pspec_2d.min(), vmax=pspec_2d.max(),
+                       locator=ticker.LogLocator(),
+                       # norm=colors.LogNorm()
+                       )
+    plt.colorbar(con, extend='both')
     plt.show()
 
-
+    plt.pcolormesh(wnum_bins, theta_bins, interp_values.reshape(henk[0].shape),
+                   norm=colors.LogNorm(vmin=pspec_2d.min(), vmax=pspec_2d.max()), )
+    plt.colorbar(extend='both')
+    plt.show()
