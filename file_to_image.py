@@ -2,6 +2,7 @@ import sys
 
 import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
+import pyproj
 from miscellaneous import make_great_circle_points, check_argv_num, load_settings
 from pyresample import get_area_def
 from satpy import Scene
@@ -10,22 +11,39 @@ from satpy.writers import get_enhanced_image
 from sonde_locs import sonde_locs
 
 
-def produce_scene(filename, area_extent=None):
+def produce_scene(filename, bottomleft=None, topright=None, grid='latlon'):
+    if bottomleft is None:
+        bottomleft = [-11.5, 49.5]
+
+    if topright is None:
+        topright = [2, 60]
+
     # load file
-    if area_extent is None:
-        area_extent = [-11.5, 49.5, 2, 60]
     global_scene = Scene(reader="seviri_l1b_native", filenames=[filename], reader_kwargs={'fill_disk': True})
     global_scene.load(['HRV'], upper_right_corner='NE')
 
     # define area
     area_id = '1'
     # TODO change so that each pixel is approximately square in distance not lonlat?
-    x_size = (area_extent[2] - area_extent[0]) * 101
-    y_size = (area_extent[3] - area_extent[1]) * 101
+    if grid == 'latlon':
+        # 101x101 with constant lat / constant lon pixels (but lat and lon are not necessarily the same)
+        x_size = (topright[0] - bottomleft[0]) * 101
+        y_size = (topright[1] - bottomleft[1]) * 101
+
+    if grid == 'km':
+        # currently only supports pixels of 1 km
+        midx = (bottomleft[0] + topright[0]) / 2
+        midy = (bottomleft[1] + topright[1]) / 2
+        g = pyproj.Geod(ellps='WGS84')
+        _, _, Lx = g.inv(bottomleft[0], midy, topright[0], midy)
+        _, _, Ly = g.inv(midx, bottomleft[1], midx, topright[1])
+        x_size = Lx // 1000
+        y_size = Ly // 1000
+
     projection = ccrs.PlateCarree().proj4_params
     description = "UK"
     proj_id = 'PlateCarree'
-    a = get_area_def(area_id, description, proj_id, projection, x_size, y_size, area_extent)
+    a = get_area_def(area_id, description, proj_id, projection, x_size, y_size, [*bottomleft, *topright])
     crs = a.to_cartopy_crs()
 
     scene2 = global_scene.resample(a)
