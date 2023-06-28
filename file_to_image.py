@@ -7,6 +7,8 @@ from pyresample import get_area_def
 from satpy import Scene
 from satpy.writers import get_enhanced_image
 
+from sonde_locs import sonde_locs
+
 
 def produce_scene(filename, area_extent=None):
     # load file
@@ -17,6 +19,7 @@ def produce_scene(filename, area_extent=None):
 
     # define area
     area_id = '1'
+    # TODO change so that each pixel is approximately square in distance not lonlat?
     x_size = (area_extent[2] - area_extent[0]) * 101
     y_size = (area_extent[3] - area_extent[1]) * 101
     projection = ccrs.PlateCarree().proj4_params
@@ -41,12 +44,14 @@ def produce_image(scene2, crs, filename, coastlines=False, save_name=None, save=
     if great_circle is not None:
         ax.plot(great_circle[0], great_circle[1], color='r', zorder=50)
 
+    plt.scatter(*sonde_locs['valentia'], marker='*', color='r', edgecolors='k', s=250, zorder=100)
     if save:
         if save_name is None:
             save_name = f'{filename[-32:-28]}-{filename[-28:-26]}-{filename[-26:-24]}_{filename[-24:-22]}_{filename[-22:-20]}'
             if coastlines:
                 save_name = 'coastlines_' + save_name
         plt.savefig('images/' + save_name + '.png', dpi=300)
+
     return fig, ax
 
 
@@ -57,7 +62,7 @@ if __name__ == '__main__':
 
     gc, dists = make_great_circle_points(s.gc_start, s.gc_end, n=s.n)
     scene, crs = produce_scene(s.sat_file,
-                               area_extent=[*s.map_bottomleft, *s.map_topright]
+                               area_extent=[*s.satellite_bottomleft, *s.satellite_topright]
                                )
 
     fig, ax = produce_image(scene, crs, s.sat_file, coastlines=True, save=True, save_name='test', great_circle=gc)
