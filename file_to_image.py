@@ -24,7 +24,6 @@ def produce_scene(filename, bottomleft=None, topright=None, grid='latlon'):
 
     # define area
     area_id = '1'
-    # TODO change so that each pixel is approximately square in distance not lonlat?
     if grid == 'latlon':
         # 101x101 with constant lat / constant lon pixels (but lat and lon are not necessarily the same)
         x_size = (topright[0] - bottomleft[0]) * 101
