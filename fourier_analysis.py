@@ -2,19 +2,32 @@ import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pyproj
 import scipy.interpolate
 from matplotlib import ticker, colors
 from miscellaneous import check_argv_num, load_settings
 from scipy import stats
+from scipy.signal import argrelmax
 
 from file_to_image import produce_scene
 from functions import create_bins, recip_space, extract_distances, ideal_bandpass
 
 
+def stripey_test(orig_shape, Lx, Ly, wavelens, angles):
+    x = np.linspace(-Lx / 2, Lx / 2, orig_shape[1])
+    y = np.linspace(-Ly / 2, Ly / 2, orig_shape[0])
+    X, Y = np.meshgrid(x, y)
+    total = np.zeros(X.shape)
+
+    for wavelen, angle in zip(wavelens, angles):
+        total += make_stripes(X, Y, wavelen, angle)
+
+    return total
+
+
 def make_radial_pspec(pspec_2d: np.ma.masked_array, wavenumbers, wavenumber_bin_width, thetas, theta_bin_width):
+    # TODO get rid of angular pspec since this function essentially does the same?
     wnum_bins, wnum_vals = create_bins((0, wavenumbers.max()), wavenumber_bin_width)
-    theta_ranges, _ = create_bins((-theta_bin_width / 2, 180 - theta_bin_width / 2), theta_bin_width)
+    theta_ranges, theta_vals = create_bins((-theta_bin_width / 2, 180 - theta_bin_width / 2), theta_bin_width)
     thetas_redefined = thetas.copy()
     thetas_redefined[(180 - theta_bin_width / 2 <= thetas_redefined) & (thetas_redefined < 180)] -= 180
     radial_pspec_array = []
@@ -30,7 +43,7 @@ def make_radial_pspec(pspec_2d: np.ma.masked_array, wavenumbers, wavenumber_bin_
         radial_pspec *= np.pi * (wnum_bins[1:] ** 2 - wnum_bins[:-1] ** 2) * np.deg2rad(theta_bin_width)
         radial_pspec_array.append(radial_pspec)
 
-    return np.array(radial_pspec_array), wnum_bins, theta_ranges
+    return np.array(radial_pspec_array), wnum_bins, wnum_vals, theta_ranges, theta_vals
 
 
 def make_angular_pspec(pspec_2d: np.ma.masked_array, thetas, theta_bin_width, wavelengths, wavelength_ranges):
@@ -53,6 +66,47 @@ def make_angular_pspec(pspec_2d: np.ma.masked_array, thetas, theta_bin_width, wa
         ang_pspec_array.append(ang_pspec)
 
     return ang_pspec_array, theta_vals
+
+def make_stripes(X, Y, wavelength, angle):
+    angle += 90
+    angle = np.deg2rad(angle)
+    return np.sin(2 * np.pi * (X * np.cos(angle) + Y * np.sin(angle)) / wavelength)
+
+
+def interp_to_polar(pspec_2d, wavenumbers, thetas, theta_bins=(0, 180), theta_step=1, wnum_range=(0.2, 2), wnum_step=0.01):
+    """Interpolates power spectrum onto polar grid"""
+
+    # create values of theta and wavenumber at which to interpolate
+    theta_bins_interp, theta_gridp = create_bins(theta_bins, theta_step)
+    wnum_bins_interp, wavenumber_gridp = create_bins(wnum_range, wnum_step)
+    meshed_polar = np.meshgrid(wavenumber_gridp, theta_gridp)
+
+    points = np.array([[k, l] for k, l in zip(wavenumbers.flatten(), thetas.flatten())])
+    xi = np.array([[w, t] for w, t in zip(meshed_polar[0].flatten(), meshed_polar[1].flatten())])
+    values = pspec_2d.flatten()
+
+    interp_values = scipy.interpolate.griddata(points, values.data, xi, method='linear')
+
+    grid = xi.reshape(meshed_polar[0].shape[0], meshed_polar[0].shape[1], 2)
+
+    return wnum_bins_interp, theta_bins_interp, grid, interp_values.reshape(meshed_polar[0].shape)
+
+
+def find_max(polar_pspec, wnum_vals, theta_vals):
+    meshed_polar = np.meshgrid(wnum_vals, theta_vals)
+    dom_theta_idx, dom_wnums_idx = argrelmax(polar_pspec)
+    max_idx = np.nanargmax(polar_pspec)
+    #
+    return meshed_polar[0].flatten()[max_idx], meshed_polar[1].flatten()[max_idx]
+    # return wnum_vals[dom_wnums_idx], theta_vals[dom_theta_idx]
+
+
+def apply_wnum_bounds(polar_pspec, wnum_vals, wnum_bins, wlen_range):
+    min_mask = (wnum_bins > 2*np.pi/wlen_range[1])[:-1]
+    max_mask = (wnum_bins < 2*np.pi/wlen_range[0])[1:]
+    mask = (min_mask & max_mask)
+
+    return polar_pspec[:, mask], wnum_vals[mask]
 
 
 def filtered_inv_plot(img, filtered_ft, Lx, Ly, latlon=None, inverse_fft=True):
@@ -169,31 +223,6 @@ def plot_ang_pspec(pspec_array, vals, wavelength_ranges):
     plt.show()
 
 
-def make_stripes(X, Y, wavelength, angle):
-    angle += 90
-    angle = np.deg2rad(angle)
-    return np.sin(2 * np.pi * (X * np.cos(angle) + Y * np.sin(angle)) / wavelength)
-
-
-def interp_to_polar(pspec_2d, wavenumbers, thetas, theta_bins=(0, 180), theta_step=1, wnum_range=(0.2, 2), wnum_step=0.01):
-    """Interpolates power spectrum onto polar grid"""
-
-    # create values of theta and wavenumber at which to interpolate
-    theta_bins_interp, theta_gridp = create_bins(theta_bins, theta_step)
-    wnum_bins_interp, wavenumber_gridp = create_bins(wnum_range, wnum_step)
-    meshed_polar = np.meshgrid(wavenumber_gridp, theta_gridp)
-
-    points = np.array([[k, l] for k, l in zip(wavenumbers.flatten(), thetas.flatten())])
-    xi = np.array([[w, t] for w, t in zip(meshed_polar[0].flatten(), meshed_polar[1].flatten())])
-    values = pspec_2d.flatten()
-
-    interp_values = scipy.interpolate.griddata(points, values.data, xi, method='linear')
-
-    grid = xi.reshape(meshed_polar[0].shape[0], meshed_polar[0].shape[1], 2)
-
-    return wnum_bins_interp, theta_bins_interp, grid, interp_values.reshape(meshed_polar[0].shape)
-
-
 def plot_interp_contour(grid, interp_values):
     """Plots interpolated values on a contour plot. Colourscale is weird though"""
     con = plt.contourf(grid[:, :, 0], grid[:, :, 1], interp_values, locator=ticker.LogLocator())
@@ -213,18 +242,6 @@ def plot_interp_pcolormesh(wnum_bins_interp, theta_bins_interp, interp_values):
     plt.show()
 
 
-def stripey_test(orig_shape, Lx, Ly, wavelens, angles):
-    x = np.linspace(-Lx / 2, Lx / 2, orig_shape[1])
-    y = np.linspace(-Ly / 2, Ly / 2, orig_shape[0])
-    X, Y = np.meshgrid(x, y)
-    total = np.zeros(X.shape)
-
-    for wavelen, angle in zip(wavelens, angles):
-        total += make_stripes(X, Y, wavelen, angle)
-
-    return total
-
-
 def plot_pspec_polar(wnum_bins, theta_bins, radial_pspec_array, scale='linear', xlim=None):
     plt.pcolormesh(wnum_bins, theta_bins, radial_pspec_array, norm='log')
     plt.xscale(scale)
@@ -233,7 +250,6 @@ def plot_pspec_polar(wnum_bins, theta_bins, radial_pspec_array, scale='linear', 
     plt.colorbar()
     plt.xlabel(r"$|\mathbf{k}|$" + ' / ' + r"$\rm{km}^{-1}$")
     plt.ylabel(r'$\theta$')
-    plt.show()
 
 
 if __name__ == '__main__':
@@ -252,8 +268,8 @@ if __name__ == '__main__':
     ft = np.fft.fft2(orig)
     shifted_ft = np.fft.fftshift(ft)
 
-    min_lambda = 5
-    max_lambda = 35
+    min_lambda = 3
+    max_lambda = 25
     bandpassed = ideal_bandpass(shifted_ft, Lx, Ly, 2 * np.pi / max_lambda, 2 * np.pi / min_lambda)
     filtered_inv_plot(orig, bandpassed, Lx, Ly, inverse_fft=True
                       # latlon=area_extent
@@ -265,23 +281,36 @@ if __name__ == '__main__':
 
     wnum_bin_width = 0.1
     theta_bin_width = 5
-    radial_pspec_array, wnum_bins, theta_bins = make_radial_pspec(pspec_2d, wavenumbers, wnum_bin_width,
-                                                                  thetas, theta_bin_width)
-    wnum_vals = (wnum_bins[1:] + wnum_bins[:-1])/2
-    plot_radial_pspec(radial_pspec_array, wnum_vals, theta_bins)
+    radial_pspec, wnum_bins, wnum_vals, theta_bins, theta_vals = make_radial_pspec(pspec_2d, wavenumbers, wnum_bin_width,
+                                                            thetas, theta_bin_width)
 
-    wavelength_ranges = [1, 4, 6, 8, 10, 12, 15, 20, 35]
-    ang_pspec_array, theta_vals = make_angular_pspec(pspec_2d, thetas, theta_bin_width, wavelengths, wavelength_ranges)
+    radial_pspec *= wnum_vals**2
 
-    plot_ang_pspec(ang_pspec_array, theta_vals, wavelength_ranges)
+    plot_radial_pspec(radial_pspec, wnum_vals, theta_bins)
+
+    # wavelength_ranges = [1, 4, 6, 8, 10, 12, 15, 20, 35]
+    # ang_pspec_array, theta_vals = make_angular_pspec(pspec_2d, thetas, theta_bin_width, wavelengths, wavelength_ranges)
+    #
+    # plot_ang_pspec(ang_pspec_array, theta_vals, wavelength_ranges)
 
     # TODO do plot of a satellite image without trapped lee waves?
 
-    wnum_bins_interp, theta_bins_interp, grid, interp_values = interp_to_polar(pspec_2d.data, wavenumbers, thetas)
+    # wnum_bins_interp, theta_bins_interp, grid, interp_values = interp_to_polar(pspec_2d.data, wavenumbers, thetas)
+    # plot_interp_contour(grid, interp_values)
+    # plot_interp_pcolormesh(wnum_bins_interp, theta_bins_interp, interp_values)
 
-    plot_interp_contour(grid, interp_values)
-    plot_interp_pcolormesh(wnum_bins_interp, theta_bins_interp, interp_values)
+    bounded_polar_pspec, bounded_wnum_vals = apply_wnum_bounds(radial_pspec, wnum_vals, wnum_bins, (3, 20))
 
-    plot_pspec_polar(wnum_bins, theta_bins, radial_pspec_array)
-    plot_pspec_polar(wnum_bins, theta_bins, radial_pspec_array, scale='log', xlim=(0.05, 4.5))
+    dominant_wnum, dominant_theta = find_max(bounded_polar_pspec, bounded_wnum_vals, theta_vals)
+
+    plot_pspec_polar(wnum_bins, theta_bins, radial_pspec)
+
+    plt.scatter(dominant_wnum, dominant_theta, marker='x', color='k', s=100, zorder=100)
+    plt.show()
+    plot_pspec_polar(wnum_bins, theta_bins, radial_pspec, scale='log', xlim=(0.05, 4.5))
+    plt.scatter(dominant_wnum, dominant_theta, marker='x', color='k', s=100, zorder=100)
+    plt.show()
+
+    print(f'Dominant wavelength: {2*np.pi / dominant_wnum:.2f} km')
+    print(f'Dominant angle: {dominant_theta:.1f} deg from north')
 
