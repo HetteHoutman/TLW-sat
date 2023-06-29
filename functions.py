@@ -40,6 +40,6 @@ def extract_distances(lats, lons):
 
 
 def create_bins(range, bin_width):
-    bins = np.linspace(range[0], range[1], int(np.ceil(range[1] / bin_width) + 1))
+    bins = np.linspace(range[0], range[1], int(np.ceil((range[1] - range[0]) / bin_width) + 1))
     vals = 0.5 * (bins[1:] + bins[:-1])
     return bins, vals

@@ -30,7 +30,7 @@ def make_radial_pspec(pspec_2d: np.ma.masked_array, wavenumbers, wavenumber_bin_
         radial_pspec *= np.pi * (wnum_bins[1:] ** 2 - wnum_bins[:-1] ** 2) * np.deg2rad(theta_bin_width)
         radial_pspec_array.append(radial_pspec)
 
-    return radial_pspec_array, wnum_bins, theta_ranges
+    return np.array(radial_pspec_array), wnum_bins, theta_ranges
 
 
 def make_angular_pspec(pspec_2d: np.ma.masked_array, thetas, theta_bin_width, wavelengths, wavelength_ranges):
@@ -175,98 +175,113 @@ def make_stripes(X, Y, wavelength, angle):
     return np.sin(2 * np.pi * (X * np.cos(angle) + Y * np.sin(angle)) / wavelength)
 
 
-if __name__ == '__main__':
-    check_argv_num(sys.argv, 1, "(settings json file)")
-    s = load_settings(sys.argv[1])
-    filename = s.sat_file
-    scene, crs = produce_scene(filename, bottomleft=s.map_bottomleft, topright=s.map_topright,
-                               grid='km')
-    Lx, Ly = extract_distances(scene['HRV'].y[::-1], scene['HRV'].x)
-    orig = np.array(scene['HRV'].data)
+def interp_to_polar(pspec_2d, wavenumbers, thetas, theta_bins=(0, 180), theta_step=1, wnum_range=(0.2, 2), wnum_step=0.01):
+    """Interpolates power spectrum onto polar grid"""
 
-    x = np.linspace(-Lx / 2, Lx / 2, orig.shape[1])
-    y = np.linspace(-Ly / 2, Ly / 2, orig.shape[0])
-    X, Y = np.meshgrid(x, y)
-    stripe1 = make_stripes(X, Y, 10, 15)
-    stripe2 = make_stripes(X, Y, 5, 135)
-
-    # orig = stripe1 + stripe2
-
-    ft = np.fft.fft2(orig)
-    shifted_ft = np.fft.fftshift(ft)
-
-    # basic_plot(orig, shifted_ft, Lx, Ly)
-    min_lambda = 5
-    max_lambda = 35
-    bandpassed = ideal_bandpass(shifted_ft, Lx, Ly, 2 * np.pi / max_lambda, 2 * np.pi / min_lambda)
-    filtered_inv_plot(orig, bandpassed, Lx, Ly,
-                      # latlon=area_extent,
-                      inverse_fft=True)
-
-    # TODO check if this is mathematically the right way of calculating pspec
-    pspec_2d = np.ma.masked_where(bandpassed.mask, abs(shifted_ft) ** 2)
-    plot_2D_pspec(pspec_2d, Lx, Ly, wavelength_contours=[5, 10, 35])
-    K, L, wavenumbers, thetas = recip_space(Lx, Ly, ft.shape)
-    wavelengths = 2 * np.pi / wavenumbers
-
-    wnum_bin_width = 0.1
-    theta_bin_width = 5
-    radial_pspec_array, wnum_bins, theta_ranges = make_radial_pspec(pspec_2d, wavenumbers, wnum_bin_width,
-                                                                    thetas, theta_bin_width)
-    wnum_vals = (wnum_bins[1:] + wnum_bins[:-1])/2
-    plot_radial_pspec(radial_pspec_array, wnum_vals, theta_ranges)
-
-    wavelength_ranges = [1, 4, 6, 8, 10, 12, 15, 20, 35]
-    ang_pspec_array, theta_vals = make_angular_pspec(pspec_2d, thetas, theta_bin_width, wavelengths, wavelength_ranges)
-
-    plot_ang_pspec(ang_pspec_array, theta_vals, wavelength_ranges)
-    # TODO plot a sort of 2d binned version of the above two plots in a 3d plot, then search for maxima (like Belinchon et al.)? although the search does not have to be performed in that space, of course.
-    # TODO do plot of a satellite image without trapped lee waves?
     # create values of theta and wavenumber at which to interpolate
-    theta_bins, theta_gridp = create_bins((0, 180), 1)
-    wnum_bins_interp, wavenumber_gridp = create_bins((0.2, 2), 0.01)
+    theta_bins_interp, theta_gridp = create_bins(theta_bins, theta_step)
+    wnum_bins_interp, wavenumber_gridp = create_bins(wnum_range, wnum_step)
     meshed_polar = np.meshgrid(wavenumber_gridp, theta_gridp)
-    # thetas = -np.rad2deg(np.arctan2(K, L)) + 180
+
     points = np.array([[k, l] for k, l in zip(wavenumbers.flatten(), thetas.flatten())])
     xi = np.array([[w, t] for w, t in zip(meshed_polar[0].flatten(), meshed_polar[1].flatten())])
-    values = pspec_2d.data.flatten()
-    interp_values = scipy.interpolate.griddata(points, values.data, xi, method='linear')
-    grid = xi.reshape(meshed_polar[0].shape[0], meshed_polar[0].shape[1], 2)
-    # lev_exp = np.arange(np.floor(np.log10(pspec_2d.min()) - 1),
-    #                                        np.ceil(np.log10(pspec_2d.max())+1))
-    # levs = np.power(10, lev_exp)
+    values = pspec_2d.flatten()
 
-    con = plt.contourf(grid[:, :, 0], grid[:, :, 1], interp_values.reshape(meshed_polar[0].shape),
-                       # levs,
-                       # vmin=pspec_2d.min(), vmax=pspec_2d.max(),
-                       locator=ticker.LogLocator(),
-                       # norm=colors.LogNorm()
-                       )
+    interp_values = scipy.interpolate.griddata(points, values.data, xi, method='linear')
+
+    grid = xi.reshape(meshed_polar[0].shape[0], meshed_polar[0].shape[1], 2)
+
+    return wnum_bins_interp, theta_bins_interp, grid, interp_values.reshape(meshed_polar[0].shape)
+
+
+def plot_interp_contour(grid, interp_values):
+    """Plots interpolated values on a contour plot. Colourscale is weird though"""
+    con = plt.contourf(grid[:, :, 0], grid[:, :, 1], interp_values, locator=ticker.LogLocator())
     plt.colorbar(con, extend='both')
     plt.xlabel(r"$|\mathbf{k}|$" + ' / ' + r"$\rm{km}^{-1}$")
     plt.ylabel(r'$\theta$')
     plt.show()
 
-    plt.pcolormesh(wnum_bins_interp, theta_bins, interp_values.reshape(meshed_polar[0].shape),
+
+def plot_interp_pcolormesh(wnum_bins_interp, theta_bins_interp, interp_values):
+    """Plots interpolated values on a pcolormesh plot."""
+    plt.pcolormesh(wnum_bins_interp, theta_bins_interp, interp_values,
                    norm=colors.LogNorm(vmin=pspec_2d.min(), vmax=pspec_2d.max()), )
     plt.colorbar(extend='both')
     plt.xlabel(r"$|\mathbf{k}|$" + ' / ' + r"$\rm{km}^{-1}$")
     plt.ylabel(r'$\theta$')
     plt.show()
 
-    henk = np.array(radial_pspec_array)
 
-    plt.pcolormesh(wnum_bins, theta_ranges, henk, norm='log')
+def stripey_test(orig_shape, Lx, Ly, wavelens, angles):
+    x = np.linspace(-Lx / 2, Lx / 2, orig_shape[1])
+    y = np.linspace(-Ly / 2, Ly / 2, orig_shape[0])
+    X, Y = np.meshgrid(x, y)
+    total = np.zeros(X.shape)
+
+    for wavelen, angle in zip(wavelens, angles):
+        total += make_stripes(X, Y, wavelen, angle)
+
+    return total
+
+
+def plot_pspec_polar(wnum_bins, theta_bins, radial_pspec_array, scale='linear', xlim=None):
+    plt.pcolormesh(wnum_bins, theta_bins, radial_pspec_array, norm='log')
+    plt.xscale(scale)
+    if xlim is not None:
+        plt.xlim(xlim)
     plt.colorbar()
     plt.xlabel(r"$|\mathbf{k}|$" + ' / ' + r"$\rm{km}^{-1}$")
     plt.ylabel(r'$\theta$')
     plt.show()
 
-    plt.pcolormesh(wnum_bins, theta_ranges, henk, norm='log')
-    plt.xscale('log')
-    plt.xlim(0.05, 4.5)
-    plt.colorbar()
-    plt.xlabel(r"$|\mathbf{k}|$" + ' / ' + r"$\rm{km}^{-1}$")
-    plt.ylabel(r'$\theta$')
-    plt.show()
+
+if __name__ == '__main__':
+    check_argv_num(sys.argv, 1, "(settings json file)")
+    s = load_settings(sys.argv[1])
+
+    scene, crs = produce_scene(s.sat_file, bottomleft=s.map_bottomleft, topright=s.map_topright, grid='km')
+    Lx, Ly = extract_distances(scene['HRV'].y[::-1], scene['HRV'].x)
+    orig = np.array(scene['HRV'].data)
+
+    K, L, wavenumbers, thetas = recip_space(Lx, Ly, orig.shape)
+    wavelengths = 2 * np.pi / wavenumbers
+
+    # orig = stripey_test(orig.shape, Lx, Ly, [10, 5], [15, 135])
+
+    ft = np.fft.fft2(orig)
+    shifted_ft = np.fft.fftshift(ft)
+
+    min_lambda = 5
+    max_lambda = 35
+    bandpassed = ideal_bandpass(shifted_ft, Lx, Ly, 2 * np.pi / max_lambda, 2 * np.pi / min_lambda)
+    filtered_inv_plot(orig, bandpassed, Lx, Ly, inverse_fft=True
+                      # latlon=area_extent
+                      )
+
+    # TODO check if this is mathematically the right way of calculating pspec
+    pspec_2d = np.ma.masked_where(bandpassed.mask, abs(shifted_ft) ** 2)
+    plot_2D_pspec(pspec_2d, Lx, Ly, wavelength_contours=[5, 10, 35])
+
+    wnum_bin_width = 0.1
+    theta_bin_width = 5
+    radial_pspec_array, wnum_bins, theta_bins = make_radial_pspec(pspec_2d, wavenumbers, wnum_bin_width,
+                                                                  thetas, theta_bin_width)
+    wnum_vals = (wnum_bins[1:] + wnum_bins[:-1])/2
+    plot_radial_pspec(radial_pspec_array, wnum_vals, theta_bins)
+
+    wavelength_ranges = [1, 4, 6, 8, 10, 12, 15, 20, 35]
+    ang_pspec_array, theta_vals = make_angular_pspec(pspec_2d, thetas, theta_bin_width, wavelengths, wavelength_ranges)
+
+    plot_ang_pspec(ang_pspec_array, theta_vals, wavelength_ranges)
+
+    # TODO do plot of a satellite image without trapped lee waves?
+
+    wnum_bins_interp, theta_bins_interp, grid, interp_values = interp_to_polar(pspec_2d.data, wavenumbers, thetas)
+
+    plot_interp_contour(grid, interp_values)
+    plot_interp_pcolormesh(wnum_bins_interp, theta_bins_interp, interp_values)
+
+    plot_pspec_polar(wnum_bins, theta_bins, radial_pspec_array)
+    plot_pspec_polar(wnum_bins, theta_bins, radial_pspec_array, scale='log', xlim=(0.05, 4.5))
 
