@@ -36,8 +36,9 @@ def produce_scene(filename, bottomleft=None, topright=None, grid='latlon'):
         g = pyproj.Geod(ellps='WGS84')
         _, _, Lx = g.inv(bottomleft[0], midy, topright[0], midy)
         _, _, Ly = g.inv(midx, bottomleft[1], midx, topright[1])
-        x_size = Lx // 1000
-        y_size = Ly // 1000
+        # TODO i added '+1' below for testing, should remove
+        x_size = Lx // 1000 + 1
+        y_size = Ly // 1000 + 1
 
     projection = ccrs.PlateCarree().proj4_params
     description = "UK"
@@ -79,7 +80,8 @@ if __name__ == '__main__':
 
     gc, dists = make_great_circle_points(s.gc_start, s.gc_end, n=s.n)
     scene, crs = produce_scene(s.sat_file,
-                               area_extent=[*s.satellite_bottomleft, *s.satellite_topright]
+                               bottomleft=s.satellite_bottomleft,
+                               topright=s.satellite_topright
                                )
 
     fig, ax = produce_image(scene, crs, s.sat_file, coastlines=True, save=True, save_name='test', great_circle=gc)

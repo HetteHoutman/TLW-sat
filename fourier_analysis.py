@@ -21,6 +21,11 @@ def stripey_test(orig_shape, Lx, Ly, wavelens, angles):
     for wavelen, angle in zip(wavelens, angles):
         total += make_stripes(X, Y, wavelen, angle)
 
+    # this ensures the stripes are roughly in the same range as the input data
+    middle = (orig.max() + orig.min()) / 2
+    total *= (orig.max() - orig.min()) / (total.max() - total.min())
+    total += middle
+
     return total
 
 
@@ -179,7 +184,7 @@ def plot_2D_pspec(bandpassed_pspec, Lx, Ly, wavelength_contours=None):
     plt.show()
 
 
-def plot_radial_pspec(pspec_array, vals, theta_ranges):
+def plot_radial_pspec(pspec_array, vals, theta_ranges, dom_wnum):
     plt.rcParams["axes.prop_cycle"] = plt.cycler("color", plt.cm.rainbow(np.linspace(0, 1, len(pspec_array))))
     for i, pspec in enumerate(pspec_array):
         plt.loglog(vals, pspec, label=f'{theta_ranges[i]}' + r'$ \leq \theta < $' + f'{theta_ranges[i + 1]}')
@@ -196,6 +201,7 @@ def plot_radial_pspec(pspec_array, vals, theta_ranges):
     # plt.vlines(np.pi / max(pixel_y, pixel_x), ymin, ymax, 'k', linestyles='dotted')
     plt.vlines(2 * np.pi / min_lambda, ymin, ymax, 'k', linestyles='-.')
     plt.vlines(2 * np.pi / max_lambda, ymin, ymax, 'k', linestyles='-.')
+    plt.vlines(dom_wnum, ymin, ymax, 'k')
 
     plt.title('1D Power Spectrum')
     plt.xlabel(r"$|\mathbf{k}|$" + ' / ' + r"$\rm{km}^{-1}$")
@@ -247,6 +253,11 @@ def plot_pspec_polar(wnum_bins, theta_bins, radial_pspec_array, scale='linear', 
     plt.xscale(scale)
     if xlim is not None:
         plt.xlim(xlim)
+    plt.ylim(theta_bins[0], theta_bins[-1])
+
+    plt.vlines(2 * np.pi / min_lambda, theta_bins[0], theta_bins[-1], 'k', linestyles='-.')
+    plt.vlines(2 * np.pi / max_lambda, theta_bins[0], theta_bins[-1], 'k', linestyles='-.')
+
     plt.colorbar()
     plt.xlabel(r"$|\mathbf{k}|$" + ' / ' + r"$\rm{km}^{-1}$")
     plt.ylabel(r'$\theta$')
@@ -259,6 +270,7 @@ if __name__ == '__main__':
     scene, crs = produce_scene(s.sat_file, bottomleft=s.map_bottomleft, topright=s.map_topright, grid='km')
     Lx, Ly = extract_distances(scene['HRV'].y[::-1], scene['HRV'].x)
     orig = np.array(scene['HRV'].data)
+    # orig -= orig.mean()
 
     K, L, wavenumbers, thetas = recip_space(Lx, Ly, orig.shape)
     wavelengths = 2 * np.pi / wavenumbers
@@ -269,7 +281,7 @@ if __name__ == '__main__':
     shifted_ft = np.fft.fftshift(ft)
 
     min_lambda = 3
-    max_lambda = 25
+    max_lambda = 20
     bandpassed = ideal_bandpass(shifted_ft, Lx, Ly, 2 * np.pi / max_lambda, 2 * np.pi / min_lambda)
     filtered_inv_plot(orig, bandpassed, Lx, Ly, inverse_fft=True
                       # latlon=area_extent
@@ -284,9 +296,8 @@ if __name__ == '__main__':
     radial_pspec, wnum_bins, wnum_vals, theta_bins, theta_vals = make_radial_pspec(pspec_2d, wavenumbers, wnum_bin_width,
                                                             thetas, theta_bin_width)
 
-    radial_pspec *= wnum_vals**2
+    # radial_pspec *= wnum_vals**2
 
-    plot_radial_pspec(radial_pspec, wnum_vals, theta_bins)
 
     # wavelength_ranges = [1, 4, 6, 8, 10, 12, 15, 20, 35]
     # ang_pspec_array, theta_vals = make_angular_pspec(pspec_2d, thetas, theta_bin_width, wavelengths, wavelength_ranges)
@@ -299,7 +310,7 @@ if __name__ == '__main__':
     # plot_interp_contour(grid, interp_values)
     # plot_interp_pcolormesh(wnum_bins_interp, theta_bins_interp, interp_values)
 
-    bounded_polar_pspec, bounded_wnum_vals = apply_wnum_bounds(radial_pspec, wnum_vals, wnum_bins, (3, 20))
+    bounded_polar_pspec, bounded_wnum_vals = apply_wnum_bounds(radial_pspec, wnum_vals, wnum_bins, (min_lambda, max_lambda))
 
     dominant_wnum, dominant_theta = find_max(bounded_polar_pspec, bounded_wnum_vals, theta_vals)
 
@@ -312,5 +323,12 @@ if __name__ == '__main__':
     plt.show()
 
     print(f'Dominant wavelength: {2*np.pi / dominant_wnum:.2f} km')
-    print(f'Dominant angle: {dominant_theta:.1f} deg from north')
+    print(f'Dominant angle: {dominant_theta:.0f} deg from north')
+
+    plot_radial_pspec(radial_pspec, wnum_vals, theta_bins, dominant_wnum)
+
+    print('smoothing?')
+
+
+
 
