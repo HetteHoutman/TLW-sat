@@ -298,18 +298,6 @@ if __name__ == '__main__':
 
     # radial_pspec *= wnum_vals**2
 
-
-    # wavelength_ranges = [1, 4, 6, 8, 10, 12, 15, 20, 35]
-    # ang_pspec_array, theta_vals = make_angular_pspec(pspec_2d, thetas, theta_bin_width, wavelengths, wavelength_ranges)
-    #
-    # plot_ang_pspec(ang_pspec_array, theta_vals, wavelength_ranges)
-
-    # TODO do plot of a satellite image without trapped lee waves?
-
-    # wnum_bins_interp, theta_bins_interp, grid, interp_values = interp_to_polar(pspec_2d.data, wavenumbers, thetas)
-    # plot_interp_contour(grid, interp_values)
-    # plot_interp_pcolormesh(wnum_bins_interp, theta_bins_interp, interp_values)
-
     bounded_polar_pspec, bounded_wnum_vals = apply_wnum_bounds(radial_pspec, wnum_vals, wnum_bins, (min_lambda, max_lambda))
 
     dominant_wnum, dominant_theta = find_max(bounded_polar_pspec, bounded_wnum_vals, theta_vals)
@@ -320,6 +308,7 @@ if __name__ == '__main__':
     plt.show()
     plot_pspec_polar(wnum_bins, theta_bins, radial_pspec, scale='log', xlim=(0.05, 4.5))
     plt.scatter(dominant_wnum, dominant_theta, marker='x', color='k', s=100, zorder=100)
+    plt.savefig('plots/polar_pspec.png', dpi=300)
     plt.show()
 
     print(f'Dominant wavelength: {2*np.pi / dominant_wnum:.2f} km')
