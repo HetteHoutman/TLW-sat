@@ -1,3 +1,4 @@
+import os
 import sys
 
 import matplotlib.pyplot as plt
@@ -148,7 +149,7 @@ def filtered_inv_plot(img, filtered_ft, Lx, Ly, latlon=None, inverse_fft=True):
                    cmap='gray')
     # save?
     plt.tight_layout()
-    plt.savefig('plots/sat_plot.png', dpi=300)
+    plt.savefig('plots/' + str(sys.argv[1][23:-5]) + '/sat_plot.png', dpi=300)
     plt.show()
 
 
@@ -180,7 +181,7 @@ def plot_2D_pspec(bandpassed_pspec, Lx, Ly, wavelength_contours=None):
     ax2.set_ylim(-2, 2)
     fig2.colorbar(im, extend='both')
     plt.tight_layout()
-    plt.savefig('plots/2d_pspec.png', dpi=300)
+    plt.savefig('plots/' + str(sys.argv[1][23:-5]) + '/2d_pspec.png', dpi=300)
     plt.show()
 
 
@@ -209,7 +210,7 @@ def plot_radial_pspec(pspec_array, vals, theta_ranges, dom_wnum):
     plt.ylim(ymin, ymax)
     plt.legend(loc='lower left')
     plt.tight_layout()
-    plt.savefig('plots/radial_pspec.png', dpi=300)
+    plt.savefig('plots/' + str(sys.argv[1][23:-5]) + '/radial_pspec.png', dpi=300)
     plt.show()
 
 
@@ -267,6 +268,9 @@ if __name__ == '__main__':
     check_argv_num(sys.argv, 1, "(settings json file)")
     s = load_settings(sys.argv[1])
 
+    if not os.path.exists('plots/' + str(sys.argv[1][23:-5])):
+        os.makedirs('plots/' + str(sys.argv[1][23:-5]))
+
     scene, crs = produce_scene(s.sat_file, bottomleft=s.map_bottomleft, topright=s.map_topright, grid='km')
     Lx, Ly = extract_distances(scene['HRV'].y[::-1], scene['HRV'].x)
     orig = np.array(scene['HRV'].data)
@@ -308,7 +312,7 @@ if __name__ == '__main__':
     plt.show()
     plot_pspec_polar(wnum_bins, theta_bins, radial_pspec, scale='log', xlim=(0.05, 4.5))
     plt.scatter(dominant_wnum, dominant_theta, marker='x', color='k', s=100, zorder=100)
-    plt.savefig('plots/polar_pspec.png', dpi=300)
+    plt.savefig('plots/' + str(sys.argv[1][23:-5]) + '/polar_pspec.png', dpi=300)
     plt.show()
 
     print(f'Dominant wavelength: {2*np.pi / dominant_wnum:.2f} km')
