@@ -249,8 +249,13 @@ def plot_interp_pcolormesh(wnum_bins_interp, theta_bins_interp, interp_values):
     plt.show()
 
 
-def plot_pspec_polar(wnum_bins, theta_bins, radial_pspec_array, scale='linear', xlim=None):
-    plt.pcolormesh(wnum_bins, theta_bins, radial_pspec_array, norm='log')
+def plot_pspec_polar(wnum_bins, theta_bins, radial_pspec_array, scale='linear', xlim=None, vmin=None, vmax=None):
+    if vmin is not None and vmax is not None:
+        plt.pcolormesh(wnum_bins, theta_bins, radial_pspec_array, norm='log', vmin=vmin, vmax=vmax)
+        plt.colorbar(extend='both')
+    else:
+        plt.pcolormesh(wnum_bins, theta_bins, radial_pspec_array, norm='log')
+        plt.colorbar()
     plt.xscale(scale)
     if xlim is not None:
         plt.xlim(xlim)
@@ -259,7 +264,6 @@ def plot_pspec_polar(wnum_bins, theta_bins, radial_pspec_array, scale='linear', 
     plt.vlines(2 * np.pi / min_lambda, theta_bins[0], theta_bins[-1], 'k', linestyles='-.')
     plt.vlines(2 * np.pi / max_lambda, theta_bins[0], theta_bins[-1], 'k', linestyles='-.')
 
-    plt.colorbar()
     plt.xlabel(r"$|\mathbf{k}|$" + ' / ' + r"$\rm{km}^{-1}$")
     plt.ylabel(r'$\theta$')
 
@@ -307,10 +311,11 @@ if __name__ == '__main__':
     dominant_wnum, dominant_theta = find_max(bounded_polar_pspec, bounded_wnum_vals, theta_vals)
 
     plot_pspec_polar(wnum_bins, theta_bins, radial_pspec)
-
     plt.scatter(dominant_wnum, dominant_theta, marker='x', color='k', s=100, zorder=100)
     plt.show()
-    plot_pspec_polar(wnum_bins, theta_bins, radial_pspec, scale='log', xlim=(0.05, 4.5))
+
+    plot_pspec_polar(wnum_bins, theta_bins, radial_pspec, scale='log', xlim=(0.05, 4.5), vmin=bounded_polar_pspec.min(),
+                     vmax=bounded_polar_pspec.max())
     plt.scatter(dominant_wnum, dominant_theta, marker='x', color='k', s=100, zorder=100)
     plt.savefig('plots/' + str(sys.argv[1][23:-5]) + '/polar_pspec.png', dpi=300)
     plt.show()
