@@ -1,9 +1,10 @@
+import os.path
 import sys
 
 import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
 import pyproj
-from miscellaneous import make_great_circle_points, check_argv_num, load_settings
+from miscellaneous import make_great_circle_points, check_argv_num, load_settings, get_bounds
 from pyresample import get_area_def
 from satpy import Scene
 from satpy.writers import get_enhanced_image
@@ -50,7 +51,7 @@ def produce_scene(filename, bottomleft=None, topright=None, grid='latlon'):
     return scene2, crs
 
 
-def produce_image(scene2, crs, filename, coastlines=False, save_name=None, save=False, great_circle=None):
+def produce_image(scene2, crs, coastlines=False, save_name=None, save=False, great_circle=None):
     fig, ax = plt.subplots(1, 1, subplot_kw=dict(projection=crs))
     img = get_enhanced_image(scene2['HRV']).data.transpose('y', 'x', 'bands')
     ax.imshow(img, transform=crs, extent=crs.bounds, origin='upper', cmap='gray')
@@ -63,26 +64,36 @@ def produce_image(scene2, crs, filename, coastlines=False, save_name=None, save=
         ax.plot(great_circle[0], great_circle[1], color='r', zorder=50)
 
     plt.scatter(*sonde_locs['valentia'], marker='*', color='r', edgecolors='k', s=250, zorder=100)
+
     if save:
+        datetime = f'{s.year}-{s.month}-{s.day}_{s.h}'
+
+        if not os.path.exists(f'images/{datetime}'):
+            os.makedirs(f'images/{datetime}')
+
         if save_name is None:
-            save_name = f'{filename[-32:-28]}-{filename[-28:-26]}-{filename[-26:-24]}_{filename[-24:-22]}_{filename[-22:-20]}'
+            save_name = sys.argv[2]
             if coastlines:
-                save_name = 'coastlines_' + save_name
-        plt.savefig('images/' + save_name + '.png', dpi=300)
+                save_name = save_name + '_coastlines'
+            if gc is not None:
+                save_name = save_name + '_gc'
+
+        plt.savefig(f'images/{datetime}/{save_name}.png', dpi=300)
 
     return fig, ax
 
 
 if __name__ == '__main__':
     # check argument number and load settings
-    check_argv_num(sys.argv, 1, "(settings json file)")
+    check_argv_num(sys.argv, 2, "(settings, region json files)")
     s = load_settings(sys.argv[1])
+    sat_bl, sat_tr, map_bl, map_tr = get_bounds(sys.argv[2])
 
     gc, dists = make_great_circle_points(s.gc_start, s.gc_end, n=s.n)
     scene, crs = produce_scene(s.sat_file,
-                               bottomleft=s.satellite_bottomleft,
-                               topright=s.satellite_topright
+                               bottomleft=sat_bl,
+                               topright=sat_tr
                                )
 
-    fig, ax = produce_image(scene, crs, s.sat_file, coastlines=True, save=True, save_name='test', great_circle=gc)
+    fig, ax = produce_image(scene, crs, coastlines=True, save=True, save_name=None, great_circle=gc)
     plt.show()

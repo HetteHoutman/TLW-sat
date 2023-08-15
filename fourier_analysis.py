@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.interpolate
 from matplotlib import ticker, colors
-from miscellaneous import check_argv_num, load_settings
+from miscellaneous import check_argv_num, load_settings, get_bounds
 from scipy import stats
 from scipy.signal import argrelmax
 
@@ -149,7 +149,7 @@ def filtered_inv_plot(img, filtered_ft, Lx, Ly, latlon=None, inverse_fft=True):
                    cmap='gray')
     # save?
     plt.tight_layout()
-    plt.savefig('plots/' + str(sys.argv[1][23:-5]) + '/sat_plot.png', dpi=300)
+    plt.savefig(save_path + '/sat_plot.png', dpi=300)
     plt.show()
 
 
@@ -181,7 +181,7 @@ def plot_2D_pspec(bandpassed_pspec, Lx, Ly, wavelength_contours=None):
     ax2.set_ylim(-2, 2)
     fig2.colorbar(im, extend='both')
     plt.tight_layout()
-    plt.savefig('plots/' + str(sys.argv[1][23:-5]) + '/2d_pspec.png', dpi=300)
+    plt.savefig(save_path + '/2d_pspec.png', dpi=300)
     plt.show()
 
 
@@ -210,7 +210,7 @@ def plot_radial_pspec(pspec_array, vals, theta_ranges, dom_wnum):
     plt.ylim(ymin, ymax)
     plt.legend(loc='lower left')
     plt.tight_layout()
-    plt.savefig('plots/' + str(sys.argv[1][23:-5]) + '/radial_pspec.png', dpi=300)
+    plt.savefig(save_path + '/radial_pspec.png', dpi=300)
     plt.show()
 
 
@@ -269,13 +269,19 @@ def plot_pspec_polar(wnum_bins, theta_bins, radial_pspec_array, scale='linear', 
 
 
 if __name__ == '__main__':
-    check_argv_num(sys.argv, 1, "(settings json file)")
+    check_argv_num(sys.argv, 2, "(settings, region json files)")
     s = load_settings(sys.argv[1])
+    sat_bl, sat_tr, map_bl, map_tr = get_bounds(sys.argv[2])
+    datetime = f'{s.year}-{s.month}-{s.day}_{s.h}'
 
-    if not os.path.exists('plots/' + str(sys.argv[1][23:-5])):
-        os.makedirs('plots/' + str(sys.argv[1][23:-5]))
+    if not os.path.exists('plots/' + datetime):
+        os.makedirs('plots/' + datetime)
 
-    scene, crs = produce_scene(s.sat_file, bottomleft=s.map_bottomleft, topright=s.map_topright, grid='km')
+    save_path = f'plots/{datetime}/{sys.argv[2]}'
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+
+    scene, crs = produce_scene(s.sat_file, bottomleft=sat_bl, topright=sat_tr, grid='km')
     Lx, Ly = extract_distances(scene['HRV'].y[::-1], scene['HRV'].x)
     orig = np.array(scene['HRV'].data)
     # orig -= orig.mean()
@@ -317,7 +323,7 @@ if __name__ == '__main__':
     plot_pspec_polar(wnum_bins, theta_bins, radial_pspec, scale='log', xlim=(0.05, 4.5), vmin=bounded_polar_pspec.min(),
                      vmax=bounded_polar_pspec.max())
     plt.scatter(dominant_wnum, dominant_theta, marker='x', color='k', s=100, zorder=100)
-    plt.savefig('plots/' + str(sys.argv[1][23:-5]) + '/polar_pspec.png', dpi=300)
+    plt.savefig(save_path + '/polar_pspec.png', dpi=300)
     plt.show()
 
     print(f'Dominant wavelength: {2*np.pi / dominant_wnum:.2f} km')
