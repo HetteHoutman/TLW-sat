@@ -5,6 +5,7 @@ import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
 import pyproj
 from miscellaneous import make_great_circle_points, check_argv_num, load_settings, get_bounds
+
 from pyresample import get_area_def
 from satpy import Scene
 from satpy.writers import get_enhanced_image
@@ -83,12 +84,19 @@ def produce_image(scene2, crs, coastlines=False, save_name=None, save=False, gre
     return fig, ax
 
 
+def set_region_vars(file):
+    region_dict = get_bounds(file,
+                             r"C:/Users/sw825517/OneDrive - University of Reading/research/code/tephi_plot/regions/")
+    globals().update(region_dict)
+
+
 if __name__ == '__main__':
     # TODO coastlines seem slightly off?
     # check argument number and load settings
     check_argv_num(sys.argv, 2, "(settings, region json files)")
     s = load_settings(sys.argv[1])
-    get_bounds(sys.argv[2], r"C:/Users/sw825517/OneDrive - University of Reading/research/code/tephi_plot/regions/")
+    set_region_vars(sys.argv[2])
+
     sat_bl, sat_tr = sat_bounds[:2], sat_bounds[2:]
 
     gc = None
