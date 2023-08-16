@@ -63,7 +63,7 @@ def produce_image(scene2, crs, coastlines=False, save_name=None, save=False, gre
     if great_circle is not None:
         ax.plot(great_circle[0], great_circle[1], color='r', zorder=50)
 
-    plt.scatter(*sonde_locs['valentia'], marker='*', color='r', edgecolors='k', s=250, zorder=100)
+    # plt.scatter(*sonde_locs['valentia'], marker='*', color='r', edgecolors='k', s=250, zorder=100)
 
     if save:
         datetime = f'{s.year}-{s.month}-{s.day}_{s.h}'
@@ -84,16 +84,23 @@ def produce_image(scene2, crs, coastlines=False, save_name=None, save=False, gre
 
 
 if __name__ == '__main__':
+    # TODO coastlines seem slightly off?
     # check argument number and load settings
     check_argv_num(sys.argv, 2, "(settings, region json files)")
     s = load_settings(sys.argv[1])
-    sat_bl, sat_tr, map_bl, map_tr = get_bounds(sys.argv[2])
+    get_bounds(sys.argv[2], r"C:/Users/sw825517/OneDrive - University of Reading/research/code/tephi_plot/regions/")
+    sat_bl, sat_tr = sat_bounds[:2], sat_bounds[2:]
 
-    gc, dists = make_great_circle_points(s.gc_start, s.gc_end, n=s.n)
+    gc = None
+    try:
+        gc, dists = make_great_circle_points(s.gc_start, s.gc_end, n=s.n)
+    except:
+        pass
+
     scene, crs = produce_scene(s.sat_file,
                                bottomleft=sat_bl,
                                topright=sat_tr
                                )
 
-    fig, ax = produce_image(scene, crs, coastlines=True, save=True, save_name=None, great_circle=gc)
+    fig, ax = produce_image(scene, crs, coastlines=False, save=True, save_name=None, great_circle=gc)
     plt.show()

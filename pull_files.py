@@ -31,7 +31,9 @@ for start in dates:
     for product in products:
         print(str(product))
 
-        if not os.path.exists('data/' + str(product)):
+        if os.path.exists('data/' + str(product)):
+            continue
+        else:
             os.makedirs('data/' + str(product))
 
         with product.open() as fsrc, \
@@ -40,7 +42,5 @@ for start in dates:
             print(f'Download of product {product} finished.')
             print(f'Unpacking {fdst.name}')
             shutil.unpack_archive(fdst.name, extract_dir=ddir + '/data/' + fdst.name[:-4])
-            print(f'Removing {fdst.name}')
-            os.remove(fdst.name)
 
 print('All downloads are finished.')
