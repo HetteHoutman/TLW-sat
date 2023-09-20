@@ -1,3 +1,4 @@
+import os
 import sys
 
 import matplotlib.pyplot as plt
@@ -17,14 +18,14 @@ if __name__ == '__main__':
                                 r"C:/Users/sw825517/OneDrive - University of Reading/research/code/tephi_plot/regions/")
     sat_bl, sat_tr = sat_bounds[:2], sat_bounds[2:]
 
-    # if not os.path.exists('plots/' + datetime):
-    #     os.makedirs('plots/' + datetime)
-    #
-    # save_path = f'plots/{datetime}/{sys.argv[2]}'
-    # if not os.path.exists(save_path):
-    #     os.makedirs(save_path)
-    #
-    # my_title = f'{datetime}_{sys.argv[2]}_sat'
+    if not os.path.exists('plots/' + datetime):
+        os.makedirs('plots/' + datetime)
+
+    save_path = f'plots/{datetime}/{sys.argv[2]}'
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+
+    my_title = f'{datetime}_{sys.argv[2]}_sat'
 
     save_path = f'plots/test'
     my_title = 'test'
