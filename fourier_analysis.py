@@ -17,17 +17,17 @@ if __name__ == '__main__':
                                 r"C:/Users/sw825517/OneDrive - University of Reading/research/code/tephi_plot/regions/")
     sat_bl, sat_tr = sat_bounds[:2], sat_bounds[2:]
 
-    # if not os.path.exists('plots/' + datetime):
-    #     os.makedirs('plots/' + datetime)
-    #
-    # save_path = f'plots/{datetime}/{sys.argv[2]}'
-    # if not os.path.exists(save_path):
-    #     os.makedirs(save_path)
-    #
-    # my_title = f'{datetime}_{sys.argv[2]}_sat'
+    if not os.path.exists('plots/' + datetime):
+        os.makedirs('plots/' + datetime)
 
-    save_path = f'plots/test'
-    my_title = 'test'
+    save_path = f'plots/{datetime}/{sys.argv[2]}'
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+
+    my_title = f'{datetime}_{sys.argv[2]}_sat'
+    #
+    # save_path = f'plots/test'
+    # my_title = 'test'
 
     scene, crs = produce_scene(s.sat_file, bottomleft=sat_bl, topright=sat_tr, grid='km')
     Lx, Ly = extract_distances(scene['HRV'].y[::-1], scene['HRV'].x)
@@ -37,7 +37,7 @@ if __name__ == '__main__':
     K, L, wavenumbers, thetas = recip_space(Lx, Ly, orig.shape)
     wavelengths = 2 * np.pi / wavenumbers
 
-    orig = stripey_test(orig, Lx, Ly, [10], [15], wiggle=0, wiggle_wavelength=20)
+    # orig = stripey_test(orig, Lx, Ly, [10], [15], wiggle=0, wiggle_wavelength=20)
 
     ft = np.fft.fft2(orig)
     shifted_ft = np.fft.fftshift(ft)
@@ -57,7 +57,7 @@ if __name__ == '__main__':
     plt.savefig(save_path + '/2d_pspec.png', dpi=300)
     plt.show()
 
-    wnum_bin_width = 0.1
+    wnum_bin_width = 0.05
     theta_bin_width = 5
     radial_pspec, wnum_bins, wnum_vals, theta_bins, theta_vals = make_polar_pspec(pspec_2d, wavenumbers, wnum_bin_width,
                                                                                   thetas, theta_bin_width)
