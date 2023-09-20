@@ -1,4 +1,3 @@
-import os
 import sys
 
 import matplotlib.pyplot as plt
@@ -7,6 +6,7 @@ from fourier_plot import plot_pspec_polar, plot_radial_pspec, plot_2D_pspec, fil
 from miscellaneous import check_argv_num, load_settings, get_region_var
 
 from file_to_image import produce_scene
+from psd import periodic_smooth_decomp
 
 if __name__ == '__main__':
     check_argv_num(sys.argv, 2, "(settings, region json files)")
@@ -17,17 +17,17 @@ if __name__ == '__main__':
                                 r"C:/Users/sw825517/OneDrive - University of Reading/research/code/tephi_plot/regions/")
     sat_bl, sat_tr = sat_bounds[:2], sat_bounds[2:]
 
-    if not os.path.exists('plots/' + datetime):
-        os.makedirs('plots/' + datetime)
-
-    save_path = f'plots/{datetime}/{sys.argv[2]}'
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
-
-    my_title = f'{datetime}_{sys.argv[2]}_sat'
+    # if not os.path.exists('plots/' + datetime):
+    #     os.makedirs('plots/' + datetime)
     #
-    # save_path = f'plots/test'
-    # my_title = 'test'
+    # save_path = f'plots/{datetime}/{sys.argv[2]}'
+    # if not os.path.exists(save_path):
+    #     os.makedirs(save_path)
+    #
+    # my_title = f'{datetime}_{sys.argv[2]}_sat'
+
+    save_path = f'plots/test'
+    my_title = 'test'
 
     scene, crs = produce_scene(s.sat_file, bottomleft=sat_bl, topright=sat_tr, grid='km')
     Lx, Ly = extract_distances(scene['HRV'].y[::-1], scene['HRV'].x)
@@ -38,6 +38,7 @@ if __name__ == '__main__':
     wavelengths = 2 * np.pi / wavenumbers
 
     # orig = stripey_test(orig, Lx, Ly, [10], [15], wiggle=0, wiggle_wavelength=20)
+    orig, s = periodic_smooth_decomp(orig)
 
     ft = np.fft.fft2(orig)
     shifted_ft = np.fft.fftshift(ft)
