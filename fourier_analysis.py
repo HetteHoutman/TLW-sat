@@ -5,11 +5,13 @@ import matplotlib.pyplot as plt
 from fourier import *
 from fourier_plot import plot_pspec_polar, plot_radial_pspec, plot_2D_pspec, filtered_inv_plot
 from miscellaneous import check_argv_num, load_settings, get_region_var
+from scipy.ndimage import gaussian_filter
 
 from file_to_image import produce_scene
 from psd import periodic_smooth_decomp
 
 if __name__ == '__main__':
+    k2 = True
     check_argv_num(sys.argv, 2, "(settings, region json files)")
     s = load_settings(sys.argv[1])
     datetime = f'{s.year}-{s.month}-{s.day}_{s.h}'
@@ -21,14 +23,18 @@ if __name__ == '__main__':
     if not os.path.exists('plots/' + datetime):
         os.makedirs('plots/' + datetime)
 
-    save_path = f'plots/{datetime}/{sys.argv[2]}'
+    save_path = f'plots/{datetime}/{sys.argv[2]}/'
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
     my_title = f'{datetime}_{sys.argv[2]}_sat'
 
-    save_path = f'plots/test'
-    my_title = 'test'
+    save_path = f'plots/test/'
+    my_title += '_test'
+
+    if k2:
+        save_path += 'k2_'
+        my_title += '_k2'
 
     scene, crs = produce_scene(s.sat_file, bottomleft=sat_bl, topright=sat_tr, grid='km')
     Lx, Ly = extract_distances(scene['HRV'].y[::-1], scene['HRV'].x)
@@ -38,7 +44,7 @@ if __name__ == '__main__':
     K, L, wavenumbers, thetas = recip_space(Lx, Ly, orig.shape)
     wavelengths = 2 * np.pi / wavenumbers
 
-    # orig = stripey_test(orig, Lx, Ly, [10], [15], wiggle=0, wiggle_wavelength=20)
+    # orig = stripey_test(orig, Lx, Ly, [10], [15], wiggle=20, wiggle_wavelength=20)
     orig, s = periodic_smooth_decomp(orig)
 
     ft = np.fft.fft2(orig)
@@ -50,14 +56,20 @@ if __name__ == '__main__':
     filtered_inv_plot(orig, bandpassed, Lx, Ly, inverse_fft=True, title=my_title
                       # latlon=area_extent
                       )
-    plt.savefig(save_path + '/sat_plot.png', dpi=300)
-    plt.show()
+    plt.savefig(save_path + 'sat_plot.png', dpi=300)
+    # plt.show()
+    plt.figure()
 
     # TODO check if this is mathematically the right way of calculating pspec
     pspec_2d = np.ma.masked_where(bandpassed.mask, abs(shifted_ft) ** 2)
+
+    if k2:
+        pspec_2d = np.ma.masked_where(pspec_2d.mask, pspec_2d.data * wavenumbers ** 2)
+
     plot_2D_pspec(pspec_2d, Lx, Ly, wavelength_contours=[5, 10, 35], title=my_title)
-    plt.savefig(save_path + '/2d_pspec.png', dpi=300)
-    plt.show()
+    plt.savefig(save_path + '2d_pspec.png', dpi=300)
+    # plt.show()
+    plt.figure()
 
     wnum_bin_width = 0.05
     theta_bin_width = 5
@@ -73,19 +85,21 @@ if __name__ == '__main__':
 
     plot_pspec_polar(wnum_bins, theta_bins, radial_pspec, title=my_title)
     plt.scatter(dominant_wnum, dominant_theta, marker='x', color='k', s=100, zorder=100)
-    plt.show()
+    # plt.show()
+    plt.figure()
 
     plot_pspec_polar(wnum_bins, theta_bins, radial_pspec, scale='log', xlim=(0.05, 4.5), vmin=bounded_polar_pspec.min(),
                      vmax=bounded_polar_pspec.max(), title=my_title)
     plt.scatter(dominant_wnum, dominant_theta, marker='x', color='k', s=100, zorder=100)
-    plt.savefig(save_path + '/polar_pspec.png', dpi=300)
+    plt.savefig(save_path + 'polar_pspec.png', dpi=300)
     plt.show()
 
     print(f'Dominant wavelength: {2 * np.pi / dominant_wnum:.2f} km')
     print(f'Dominant angle: {dominant_theta:.0f} deg from north')
 
     plot_radial_pspec(radial_pspec, wnum_vals, theta_bins, dominant_wnum, title=my_title)
-    plt.savefig(save_path + '/radial_pspec.png', dpi=300)
-    plt.show()
+    plt.savefig(save_path + 'radial_pspec.png', dpi=300)
+    # plt.show()
+    plt.figure()
 
     print('smoothing?')
