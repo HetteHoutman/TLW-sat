@@ -78,8 +78,8 @@ if __name__ == '__main__':
     radial_pspec, wnum_bins, wnum_vals, theta_bins, theta_vals = make_polar_pspec(pspec_2d, wavenumbers, wnum_bin_width,
                                                                                   thetas, theta_bin_width)
     if smoothed:
-        pspec_2d = np.ma.masked_where(pspec_2d.mask, convolve(pspec_2d.data, Gaussian2DKernel(7, x_size=15, y_size=15)))
-        radial_pspec = convolve(radial_pspec, Gaussian2DKernel(3, x_size=11, y_size=11))
+        pspec_2d = np.ma.masked_where(pspec_2d.mask, convolve(pspec_2d.data, Gaussian2DKernel(7, x_size=15, y_size=15), boundary='wrap'))
+        radial_pspec = convolve(radial_pspec, Gaussian2DKernel(3, x_size=11, y_size=11), boundary='wrap')
 
     plot_2D_pspec(pspec_2d, Lx, Ly, wavelength_contours=[5, 10, 35], title=my_title)
     plt.savefig(save_path + '2d_pspec.png', dpi=300)
