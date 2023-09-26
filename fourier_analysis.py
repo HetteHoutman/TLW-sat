@@ -2,18 +2,18 @@ import os
 import sys
 
 import matplotlib.pyplot as plt
+from astropy.convolution import convolve, Gaussian2DKernel
 from fourier import *
 from fourier_plot import plot_pspec_polar, plot_radial_pspec, plot_2D_pspec, filtered_inv_plot
 from miscellaneous import check_argv_num, load_settings, get_region_var
-from scipy.ndimage import gaussian_filter
-from astropy.convolution import convolve, Gaussian2DKernel
+from psd import periodic_smooth_decomp
 
 from file_to_image import produce_scene
-from psd import periodic_smooth_decomp
 
 if __name__ == '__main__':
     k2 = True
     smoothed = True
+    mag_filter = False
 
     check_argv_num(sys.argv, 2, "(settings, region json files)")
     s = load_settings(sys.argv[1])
@@ -32,8 +32,8 @@ if __name__ == '__main__':
 
     my_title = f'{datetime}_{sys.argv[2]}_sat'
 
-    save_path = f'plots/test/'
-    my_title += '_test'
+    # save_path = f'plots/test/'
+    # my_title += '_test'
 
     if k2:
         save_path += 'k2_'
@@ -43,6 +43,10 @@ if __name__ == '__main__':
         save_path += 'smoothed_'
         my_title += '_smoothed'
 
+    if mag_filter:
+        save_path += 'magfiltered_'
+        my_title += '_magfiltered'
+
     scene, crs = produce_scene(s.sat_file, bottomleft=sat_bl, topright=sat_tr, grid='km')
     Lx, Ly = extract_distances(scene['HRV'].y[::-1], scene['HRV'].x)
     orig = np.array(scene['HRV'].data)
@@ -51,8 +55,13 @@ if __name__ == '__main__':
     K, L, wavenumbers, thetas = recip_space(Lx, Ly, orig.shape)
     wavelengths = 2 * np.pi / wavenumbers
 
+    if mag_filter:
+        orig[(orig > 12) & (orig < 25)] = 6
     # orig = stripey_test(orig, Lx, Ly, [10], [15], wiggle=20, wiggle_wavelength=20)
     orig, s = periodic_smooth_decomp(orig)
+
+    plt.hist(orig.flatten(), bins=100)
+    plt.savefig(save_path + 'hist.png', dpi=300)
 
     ft = np.fft.fft2(orig)
     shifted_ft = np.fft.fftshift(ft)
@@ -60,6 +69,7 @@ if __name__ == '__main__':
     min_lambda = 4
     max_lambda = 25
     bandpassed = ideal_bandpass(shifted_ft, Lx, Ly, 2 * np.pi / max_lambda, 2 * np.pi / min_lambda)
+    plt.figure()
     filtered_inv_plot(orig, bandpassed, Lx, Ly, inverse_fft=True, title=my_title
                       # latlon=area_extent
                       )
@@ -99,7 +109,7 @@ if __name__ == '__main__':
     plot_pspec_polar(wnum_bins, theta_bins,
                      radial_pspec,
                      scale='log', xlim=(0.05, 4.5),
-                     vmin=bounded_polar_pspec.min(), vmax=bounded_polar_pspec.max(),
+                     vmin=np.nanmin(bounded_polar_pspec), vmax=np.nanmax(bounded_polar_pspec),
                      title=my_title)
     plt.scatter(dominant_wnum, dominant_theta, marker='x', color='k', s=100, zorder=100)
     plt.tight_layout()
@@ -112,5 +122,3 @@ if __name__ == '__main__':
     plot_radial_pspec(radial_pspec, wnum_vals, theta_bins, dominant_wnum, title=my_title)
     plt.savefig(save_path + 'radial_pspec.png', dpi=300)
     # plt.show()
-
-    print('smoothing?')
