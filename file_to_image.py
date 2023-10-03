@@ -3,6 +3,7 @@ import sys
 
 import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
+import numpy as np
 import pyproj
 from miscellaneous import make_great_circle_points, check_argv_num, load_settings, get_region_var
 
@@ -39,8 +40,19 @@ def produce_scene(filename, bottomleft=None, topright=None, grid='latlon'):
         _, _, Lx = g.inv(bottomleft[0], midy, topright[0], midy)
         _, _, Ly = g.inv(midx, bottomleft[1], midx, topright[1])
         # TODO i added '+1' below for testing, should remove
-        x_size = Lx // 1000 + 1
-        y_size = Ly // 1000 + 1
+        x_size = Lx / 1000
+        y_size = Ly / 1000
+
+        # ensure sizes are odd
+        if np.floor(x_size) % 2 == 1:
+            x_size = np.floor(x_size)
+        else:
+            x_size = np.ceil(x_size)
+
+        if np.floor(y_size) % 2 == 1:
+            y_size = np.floor(y_size)
+        else:
+            y_size = np.ceil(y_size)
 
     projection = ccrs.PlateCarree().proj4_params
     description = "UK"
