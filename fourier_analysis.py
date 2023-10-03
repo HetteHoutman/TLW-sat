@@ -7,13 +7,60 @@ from fourier import *
 from fourier_plot import plot_pspec_polar, plot_radial_pspec, plot_2D_pspec, filtered_inv_plot
 from miscellaneous import check_argv_num, load_settings, get_region_var
 from psd import periodic_smooth_decomp
+from skimage.morphology import ellipse
+from skimage.transform import rotate
 
 from file_to_image import produce_scene
+
+
+def correlate(a1, b1):
+    a = a1.copy()
+    b = b1.copy()
+    a -= a.mean()
+    b -= b.mean()
+
+    assert a.shape == b.shape
+
+    temp = a * b
+    norm = np.sqrt(np.sum(a * a) * np.sum(b * b))
+    norm = 1
+    return np.sum(temp) / norm
+
+
+def correlate_ellipse(pspec, angles, shape):
+
+    correlation_array = np.zeros_like(pspec.data)
+    # loop over elements
+    for iy, ix in np.ndindex(pspec.shape):
+        # only consider points within lambda-range
+        if not pspec.mask[iy, ix]:
+            # rotate according to theta
+            ell = rotate(ellipse(*shape), 90 - angles[iy, ix], resize=True)
+            # make ellipse shape odd so that it has a middle pixel
+            if ell.shape[0] % 2 == 0:
+                ell = ell[1:]
+            if ell.shape[1] % 2 == 0:
+                ell = ell[:, 1:]
+
+            half_y_len = ell.shape[0] // 2
+            half_x_len = ell.shape[1] // 2
+            sub_matrix = pspec.data[iy - half_y_len : iy + half_y_len + 1, ix - half_x_len : ix + half_x_len + 1]
+            correlation_array[iy, ix] = correlate(sub_matrix, ell / ell.sum())
+
+            if iy == 150 and ix == 105:
+                henk = pspec.data.copy() / pspec.data.max()
+                henk[iy - half_y_len : iy + half_y_len + 1, ix - half_x_len : ix + half_x_len + 1] += (ell / ell.shape[0] / ell.shape[1])
+                plt.imshow(henk)
+                plt.show()
+
+    return np.ma.masked_where(pspec.mask, correlation_array)
+
 
 if __name__ == '__main__':
     k2 = True
     smoothed = True
     mag_filter = False
+    test = False
 
     check_argv_num(sys.argv, 2, "(settings, region json files)")
     s = load_settings(sys.argv[1])
@@ -32,8 +79,9 @@ if __name__ == '__main__':
 
     my_title = f'{datetime}_{sys.argv[2]}_sat'
 
-    # save_path = f'plots/test/'
-    # my_title += '_test'
+    if test:
+        save_path = f'plots/test/'
+        my_title += '_test'
 
     if k2:
         save_path += 'k2_'
@@ -67,14 +115,14 @@ if __name__ == '__main__':
     shifted_ft = np.fft.fftshift(ft)
 
     min_lambda = 4
-    max_lambda = 25
+    max_lambda = 35
     bandpassed = ideal_bandpass(shifted_ft, Lx, Ly, 2 * np.pi / max_lambda, 2 * np.pi / min_lambda)
     plt.figure()
     filtered_inv_plot(orig, bandpassed, Lx, Ly, inverse_fft=True, title=my_title
                       # latlon=area_extent
                       )
     plt.savefig(save_path + 'sat_plot.png', dpi=300)
-    # plt.show()
+    plt.show()
     plt.figure()
 
     # TODO check if this is mathematically the right way of calculating pspec
@@ -93,7 +141,7 @@ if __name__ == '__main__':
 
     plot_2D_pspec(pspec_2d, Lx, Ly, wavelength_contours=[5, 10, 35], title=my_title)
     plt.savefig(save_path + '2d_pspec.png', dpi=300)
-    # plt.show()
+    plt.show()
     plt.figure()
 
     bounded_polar_pspec, bounded_wnum_vals = apply_wnum_bounds(radial_pspec, wnum_vals, wnum_bins,
@@ -101,7 +149,7 @@ if __name__ == '__main__':
 
     dominant_wnum, dominant_theta = find_max(bounded_polar_pspec, bounded_wnum_vals, theta_vals)
 
-    plot_pspec_polar(wnum_bins, theta_bins, radial_pspec, title=my_title)
+    plot_pspec_polar(wnum_bins, theta_bins, radial_pspec, title=my_title, min_lambda=min_lambda, max_lambda=max_lambda)
     plt.scatter(dominant_wnum, dominant_theta, marker='x', color='k', s=100, zorder=100)
     # plt.show()
     plt.figure()
@@ -110,7 +158,7 @@ if __name__ == '__main__':
                      radial_pspec,
                      scale='log', xlim=(0.05, 4.5),
                      vmin=np.nanmin(bounded_polar_pspec), vmax=np.nanmax(bounded_polar_pspec),
-                     title=my_title)
+                     title=my_title, min_lambda=min_lambda, max_lambda=max_lambda)
     plt.scatter(dominant_wnum, dominant_theta, marker='x', color='k', s=100, zorder=100)
     plt.tight_layout()
     plt.savefig(save_path + 'polar_pspec.png', dpi=300)
@@ -122,3 +170,8 @@ if __name__ == '__main__':
     plot_radial_pspec(radial_pspec, wnum_vals, theta_bins, dominant_wnum, title=my_title)
     plt.savefig(save_path + 'radial_pspec.png', dpi=300)
     # plt.show()
+    plt.figure()
+
+    np.save(f'data/{my_title}', bounded_polar_pspec)
+
+    corr = correlate_ellipse(pspec_2d, thetas, (2, 30))
