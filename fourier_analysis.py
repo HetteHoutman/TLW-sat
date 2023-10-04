@@ -28,7 +28,6 @@ def correlate(a1, b1):
 
 
 def correlate_ellipse(pspec, angles, shape):
-
     correlation_array = np.zeros_like(pspec.data)
     # loop over elements
     for iy, ix in np.ndindex(pspec.shape):
@@ -44,12 +43,13 @@ def correlate_ellipse(pspec, angles, shape):
 
             half_y_len = ell.shape[0] // 2
             half_x_len = ell.shape[1] // 2
-            sub_matrix = pspec.data[iy - half_y_len : iy + half_y_len + 1, ix - half_x_len : ix + half_x_len + 1]
+            sub_matrix = pspec.data[iy - half_y_len: iy + half_y_len + 1, ix - half_x_len: ix + half_x_len + 1]
             correlation_array[iy, ix] = correlate(sub_matrix, ell / ell.sum())
 
             if iy == 150 and ix == 105:
                 henk = pspec.data.copy() / pspec.data.max()
-                henk[iy - half_y_len : iy + half_y_len + 1, ix - half_x_len : ix + half_x_len + 1] += (ell / ell.shape[0] / ell.shape[1])
+                henk[iy - half_y_len: iy + half_y_len + 1, ix - half_x_len: ix + half_x_len + 1] += (
+                        ell / ell.shape[0] / ell.shape[1])
                 plt.imshow(henk)
                 plt.show()
 
@@ -95,17 +95,22 @@ if __name__ == '__main__':
         save_path += 'magfiltered_'
         my_title += '_magfiltered'
 
+    # produce image
     scene, crs = produce_scene(s.sat_file, bottomleft=sat_bl, topright=sat_tr, grid='km')
     Lx, Ly = extract_distances(scene['HRV'].y[::-1], scene['HRV'].x)
     orig = np.array(scene['HRV'].data)
     # orig -= orig.mean()
 
+    # define reciprocal space
     K, L, wavenumbers, thetas = recip_space(Lx, Ly, orig.shape)
     wavelengths = 2 * np.pi / wavenumbers
 
     if mag_filter:
         orig[(orig > 12) & (orig < 25)] = 6
+
     # orig = stripey_test(orig, Lx, Ly, [10], [15], wiggle=20, wiggle_wavelength=20)
+
+    # perform decomposition to remove cross-like signal
     orig, s = periodic_smooth_decomp(orig)
 
     plt.hist(orig.flatten(), bins=100)
@@ -136,7 +141,8 @@ if __name__ == '__main__':
     radial_pspec, wnum_bins, wnum_vals, theta_bins, theta_vals = make_polar_pspec(pspec_2d, wavenumbers, wnum_bin_width,
                                                                                   thetas, theta_bin_width)
     if smoothed:
-        pspec_2d = np.ma.masked_where(pspec_2d.mask, convolve(pspec_2d.data, Gaussian2DKernel(7, x_size=15, y_size=15), boundary='wrap'))
+        pspec_2d = np.ma.masked_where(pspec_2d.mask, convolve(pspec_2d.data, Gaussian2DKernel(7, x_size=15, y_size=15),
+                                                              boundary='wrap'))
         radial_pspec = convolve(radial_pspec, Gaussian2DKernel(3, x_size=11, y_size=11), boundary='wrap')
 
     plot_2D_pspec(pspec_2d, Lx, Ly, wavelength_contours=[5, 10, 35], title=my_title)
@@ -175,3 +181,22 @@ if __name__ == '__main__':
     np.save(f'data/{my_title}', bounded_polar_pspec)
 
     corr = correlate_ellipse(pspec_2d, thetas, (2, 30))
+
+    rot_left_half = rotate(corr[:, :corr.shape[1] // 2 + 1], 180)
+    collapsed_corr = corr[:, corr.shape[1] // 2:] + rot_left_half
+
+    # mask bottom half of k_x = 0 line as this is the same as the top half
+    collapsed_corr.mask[collapsed_corr.shape[0] // 2:, 0] = True
+
+    idxs = np.unravel_index(collapsed_corr.argmax(), collapsed_corr.shape)
+
+    plt.imshow(collapsed_corr)
+    plt.scatter(idxs[1], idxs[0], marker='x')
+    plt.show()
+
+    plot_2D_pspec(pspec_2d, Lx, Ly, wavelength_contours=[5, 10, 35], title=my_title)
+    plt.scatter(K[:, K.shape[1] // 2:][*idxs], L[::-1, L.shape[1] // 2:][*idxs], marker='x')
+    plt.show()
+
+    print(f'Dominant wavelength by ellispe method: {wavelengths[:, wavelengths.shape[1] // 2:][*idxs]:.2f} km')
+    print(f'Dominant angle: {thetas[:, thetas.shape[1] // 2:][*idxs]:.0f} deg from north')
