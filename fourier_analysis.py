@@ -5,10 +5,10 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from astropy.convolution import convolve, Gaussian2DKernel
 from fourier import *
-from fourier_plot import plot_pspec_polar, plot_radial_pspec, plot_2D_pspec, filtered_inv_plot
+from fourier_plot import plot_pspec_polar, plot_radial_pspec, plot_2D_pspec, filtered_inv_plot, plot_corr
 from miscellaneous import check_argv_num, load_settings, get_region_var
 from psd import periodic_smooth_decomp
-from skimage.morphology import ellipse
+from skimage.draw import ellipse
 from skimage.transform import rotate
 
 from file_to_image import produce_scene
@@ -17,50 +17,42 @@ from file_to_image import produce_scene
 def correlate(a1, b1):
     a = a1.copy()
     b = b1.copy()
-    # a -= a.mean()
-    # b -= b.mean()
 
     assert a.shape == b.shape
 
     num = np.sum((a - a.mean()) * (b - b.sum()))
-    den = np.sqrt(np.sum((a - a.mean()) ** 2) * np.sum((b - b.mean()) ** 2))
 
-    # a /= a.std()
-    # b /= b.std()
-
-    den = 1
-
-    # return a.mean(), b.mean()
-    # return num, den
-    return num / den
+    return num
 
 
 def correlate_ellipse(pspec, angles, shape):
     """shape has to be longer in y direction"""
     correlation_array = np.zeros_like(pspec.data)
-    num_array = np.zeros_like(pspec.data)
-    den_array = np.zeros_like(pspec.data)
 
     # loop over elements
+    counter = 0
     for iy, ix in np.ndindex(pspec.shape):
         # only consider points within lambda-range
         if not pspec.mask[iy, ix]:
             # rotate according to theta
-            ell = np.pad(ellipse(*shape), ((0, 0), (shape[1] - shape[0], shape[1] - shape[0])))
-            ell = rotate(ell, 90 - angles[iy, ix], resize=False)
-            # make ellipse shape odd so that it has a middle pixel
-            # if ell.shape[0] % 2 == 0:
-            #     ell = ell[1:]
-            # if ell.shape[1] % 2 == 0:
-            #     ell = ell[:, 1:]
+            size = max(shape)
+            ell = np.zeros((size, size))
+            # ell[ellipse(size // 2, size // 2, *shape, shape=ell.shape, rotation=-angles[iy, ix] / 180 * np.pi)] = 1
+            ell[ellipse(size // 2, size // 2, *shape, shape=ell.shape, rotation=0)] = 1
+            # ell = np.pad(ellipse(*shape), ((0, 0), (shape[1] - shape[0], shape[1] - shape[0])))
+            ell = rotate(ell, -angles[iy, ix], resize=False)
 
+            # select correct sub-matrix around pixel to correlate with
             half_y_len = ell.shape[0] // 2
             half_x_len = ell.shape[1] // 2
             sub_matrix = pspec.data[iy - half_y_len: iy + half_y_len + 1, ix - half_x_len: ix + half_x_len + 1]
+
+            # correlate and assign to pixel
             correlation_array[iy, ix] = correlate(sub_matrix, ell / ell.sum())
             # num_array[iy, ix], den_array[iy, ix] = correlate(sub_matrix, ell / ell.sum())
+            counter += 1
 
-            if iy == 150 and ix == 105:
+            if counter == 1000:
                 henk = pspec.data.copy() / pspec.data.max()
                 henk[iy - half_y_len: iy + half_y_len + 1, ix - half_x_len: ix + half_x_len + 1] += (
                         ell / ell.max())
@@ -68,23 +60,6 @@ def correlate_ellipse(pspec, angles, shape):
                 plt.show()
 
     return np.ma.masked_where(pspec.mask, correlation_array)
-    # return np.ma.masked_where(pspec.mask, num_array), np.ma.masked_where(pspec.mask, den_array)
-
-
-def plot_corr(coll_corr, K, L):
-    fig2, ax2 = plt.subplots(1, 1)
-    pixel_k = K[0, 1] - K[0, 0]
-    pixel_l = L[1, 0] - L[0, 0]
-    recip_extent = [0, K.max() + pixel_k / 2, L.min() - pixel_l / 2, L.max() + pixel_l / 2]
-
-    im = ax2.imshow(coll_corr, extent=recip_extent, interpolation='none')
-
-    ax2.set_xlabel(r"$k_x$" + ' / ' + r"$\rm{km}^{-1}$")
-    ax2.set_ylabel(r"$k_y$" + ' / ' + r"$\rm{km}^{-1}$")
-    ax2.set_xlim(0, 2)
-    ax2.set_ylim(-2, 2)
-    fig2.colorbar(im, extend='both')
-    plt.tight_layout()
 
 
 if __name__ == '__main__':
