@@ -2,6 +2,7 @@ import os
 import sys
 
 import matplotlib.pyplot as plt
+import pandas as pd
 from astropy.convolution import convolve, Gaussian2DKernel
 from fourier import *
 from fourier_plot import plot_pspec_polar, plot_radial_pspec, plot_2D_pspec, filtered_inv_plot
@@ -16,47 +17,79 @@ from file_to_image import produce_scene
 def correlate(a1, b1):
     a = a1.copy()
     b = b1.copy()
-    a -= a.mean()
-    b -= b.mean()
+    # a -= a.mean()
+    # b -= b.mean()
 
     assert a.shape == b.shape
 
-    temp = a * b
-    norm = np.sqrt(np.sum(a * a) * np.sum(b * b))
-    norm = 1
-    return np.sum(temp) / norm
+    num = np.sum((a - a.mean()) * (b - b.sum()))
+    den = np.sqrt(np.sum((a - a.mean()) ** 2) * np.sum((b - b.mean()) ** 2))
+
+    # a /= a.std()
+    # b /= b.std()
+
+    den = 1
+
+    # return a.mean(), b.mean()
+    # return num, den
+    return num / den
 
 
 def correlate_ellipse(pspec, angles, shape):
+    """shape has to be longer in y direction"""
     correlation_array = np.zeros_like(pspec.data)
+    num_array = np.zeros_like(pspec.data)
+    den_array = np.zeros_like(pspec.data)
+
     # loop over elements
     for iy, ix in np.ndindex(pspec.shape):
         # only consider points within lambda-range
         if not pspec.mask[iy, ix]:
             # rotate according to theta
-            ell = rotate(ellipse(*shape), 90 - angles[iy, ix], resize=True)
+            ell = np.pad(ellipse(*shape), ((0, 0), (shape[1] - shape[0], shape[1] - shape[0])))
+            ell = rotate(ell, 90 - angles[iy, ix], resize=False)
             # make ellipse shape odd so that it has a middle pixel
-            if ell.shape[0] % 2 == 0:
-                ell = ell[1:]
-            if ell.shape[1] % 2 == 0:
-                ell = ell[:, 1:]
+            # if ell.shape[0] % 2 == 0:
+            #     ell = ell[1:]
+            # if ell.shape[1] % 2 == 0:
+            #     ell = ell[:, 1:]
 
             half_y_len = ell.shape[0] // 2
             half_x_len = ell.shape[1] // 2
             sub_matrix = pspec.data[iy - half_y_len: iy + half_y_len + 1, ix - half_x_len: ix + half_x_len + 1]
             correlation_array[iy, ix] = correlate(sub_matrix, ell / ell.sum())
+            # num_array[iy, ix], den_array[iy, ix] = correlate(sub_matrix, ell / ell.sum())
 
             if iy == 150 and ix == 105:
                 henk = pspec.data.copy() / pspec.data.max()
                 henk[iy - half_y_len: iy + half_y_len + 1, ix - half_x_len: ix + half_x_len + 1] += (
-                        ell / ell.shape[0] / ell.shape[1])
+                        ell / ell.max())
                 plt.imshow(henk)
                 plt.show()
 
     return np.ma.masked_where(pspec.mask, correlation_array)
+    # return np.ma.masked_where(pspec.mask, num_array), np.ma.masked_where(pspec.mask, den_array)
+
+
+def plot_corr(coll_corr, K, L):
+    fig2, ax2 = plt.subplots(1, 1)
+    pixel_k = K[0, 1] - K[0, 0]
+    pixel_l = L[1, 0] - L[0, 0]
+    recip_extent = [0, K.max() + pixel_k / 2, L.min() - pixel_l / 2, L.max() + pixel_l / 2]
+
+    im = ax2.imshow(coll_corr, extent=recip_extent, interpolation='none')
+
+    ax2.set_xlabel(r"$k_x$" + ' / ' + r"$\rm{km}^{-1}$")
+    ax2.set_ylabel(r"$k_y$" + ' / ' + r"$\rm{km}^{-1}$")
+    ax2.set_xlim(0, 2)
+    ax2.set_ylim(-2, 2)
+    fig2.colorbar(im, extend='both')
+    plt.tight_layout()
 
 
 if __name__ == '__main__':
+    # TODO put things into functions to clean up and make reusable
+
     k2 = True
     smoothed = True
     mag_filter = False
@@ -64,7 +97,7 @@ if __name__ == '__main__':
 
     check_argv_num(sys.argv, 2, "(settings, region json files)")
     s = load_settings(sys.argv[1])
-    datetime = f'{s.year}-{s.month}-{s.day}_{s.h}'
+    datetime = f'{s.year}-{s.month:02d}-{s.day:02d}_{s.h}'
 
     sat_bounds = get_region_var("sat_bounds", sys.argv[2],
                                 r"C:/Users/sw825517/OneDrive - University of Reading/research/code/tephi_plot/regions/")
@@ -111,7 +144,7 @@ if __name__ == '__main__':
     # orig = stripey_test(orig, Lx, Ly, [10], [15], wiggle=20, wiggle_wavelength=20)
 
     # perform decomposition to remove cross-like signal
-    orig, s = periodic_smooth_decomp(orig)
+    orig, smooth = periodic_smooth_decomp(orig)
 
     plt.hist(orig.flatten(), bins=100)
     plt.savefig(save_path + 'hist.png', dpi=300)
@@ -120,14 +153,14 @@ if __name__ == '__main__':
     shifted_ft = np.fft.fftshift(ft)
 
     min_lambda = 4
-    max_lambda = 35
+    max_lambda = 30
     bandpassed = ideal_bandpass(shifted_ft, Lx, Ly, 2 * np.pi / max_lambda, 2 * np.pi / min_lambda)
     plt.figure()
     filtered_inv_plot(orig, bandpassed, Lx, Ly, inverse_fft=True, title=my_title
                       # latlon=area_extent
                       )
     plt.savefig(save_path + 'sat_plot.png', dpi=300)
-    plt.show()
+    # plt.show()
     plt.figure()
 
     # TODO check if this is mathematically the right way of calculating pspec
@@ -147,18 +180,13 @@ if __name__ == '__main__':
 
     plot_2D_pspec(pspec_2d, Lx, Ly, wavelength_contours=[5, 10, 35], title=my_title)
     plt.savefig(save_path + '2d_pspec.png', dpi=300)
-    plt.show()
+    # plt.show()
     plt.figure()
 
     bounded_polar_pspec, bounded_wnum_vals = apply_wnum_bounds(radial_pspec, wnum_vals, wnum_bins,
                                                                (min_lambda, max_lambda))
 
     dominant_wnum, dominant_theta = find_max(bounded_polar_pspec, bounded_wnum_vals, theta_vals)
-
-    plot_pspec_polar(wnum_bins, theta_bins, radial_pspec, title=my_title, min_lambda=min_lambda, max_lambda=max_lambda)
-    plt.scatter(dominant_wnum, dominant_theta, marker='x', color='k', s=100, zorder=100)
-    # plt.show()
-    plt.figure()
 
     plot_pspec_polar(wnum_bins, theta_bins,
                      radial_pspec,
@@ -168,7 +196,8 @@ if __name__ == '__main__':
     plt.scatter(dominant_wnum, dominant_theta, marker='x', color='k', s=100, zorder=100)
     plt.tight_layout()
     plt.savefig(save_path + 'polar_pspec.png', dpi=300)
-    plt.show()
+    # plt.show()
+    plt.figure()
 
     print(f'Dominant wavelength: {2 * np.pi / dominant_wnum:.2f} km')
     print(f'Dominant angle: {dominant_theta:.0f} deg from north')
@@ -180,7 +209,18 @@ if __name__ == '__main__':
 
     np.save(f'data/{my_title}', bounded_polar_pspec)
 
-    corr = correlate_ellipse(pspec_2d, thetas, (2, 30))
+    corr = correlate_ellipse(pspec_2d, thetas, (2, 25))
+    # num, den = correlate_ellipse(pspec_2d, thetas, (2, 30))
+    #
+    # plt.imshow(num)
+    # plt.colorbar()
+    # plt.show()
+    #
+    # plt.imshow(den)
+    # plt.colorbar()
+    # plt.show()
+    #
+    # corr = num / den
 
     rot_left_half = rotate(corr[:, :corr.shape[1] // 2 + 1], 180)
     collapsed_corr = corr[:, corr.shape[1] // 2:] + rot_left_half
@@ -189,14 +229,26 @@ if __name__ == '__main__':
     collapsed_corr.mask[collapsed_corr.shape[0] // 2:, 0] = True
 
     idxs = np.unravel_index(collapsed_corr.argmax(), collapsed_corr.shape)
+    dom_K, dom_L = K[:, K.shape[1] // 2:][*idxs], L[::-1, L.shape[1] // 2:][*idxs]
+    dominant_wlen = wavelengths[:, wavelengths.shape[1] // 2:][*idxs]
+    dominant_theta = thetas[:, thetas.shape[1] // 2:][*idxs]
 
-    plt.imshow(collapsed_corr)
-    plt.scatter(idxs[1], idxs[0], marker='x')
+    plot_corr(collapsed_corr, L, K)
+    plt.scatter(dom_K, dom_L, marker='x')
+    plt.savefig(save_path + 'corr.png', dpi=300)
     plt.show()
+    plt.figure()
 
     plot_2D_pspec(pspec_2d, Lx, Ly, wavelength_contours=[5, 10, 35], title=my_title)
-    plt.scatter(K[:, K.shape[1] // 2:][*idxs], L[::-1, L.shape[1] // 2:][*idxs], marker='x')
+    plt.scatter(dom_K, dom_L, marker='x')
+    plt.savefig(save_path + '2d_pspec_withcross.png', dpi=300)
     plt.show()
 
-    print(f'Dominant wavelength by ellispe method: {wavelengths[:, wavelengths.shape[1] // 2:][*idxs]:.2f} km')
-    print(f'Dominant angle: {thetas[:, thetas.shape[1] // 2:][*idxs]:.0f} deg from north')
+    print(f'Dominant wavelength by ellipse method: {dominant_wlen:.2f} km')
+    print(f'Dominant angle by ellipse method: {dominant_theta:.0f} deg from north')
+
+    df = pd.read_excel('../../other_data/sat_vs_ukv_results.xlsx', index_col=[0, 1])
+    df.loc[(f'{s.year}-{s.month:02d}-{s.day:02d}', sys.argv[2]), 'sat_lambda_ellipse'] = dominant_wlen
+    df.loc[(f'{s.year}-{s.month:02d}-{s.day:02d}', sys.argv[2]), 'sat_theta_ellipse'] = dominant_theta
+    df.to_excel('../../other_data/sat_vs_ukv_results.xlsx')
+
