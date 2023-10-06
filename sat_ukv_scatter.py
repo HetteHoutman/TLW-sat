@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-df = pd.read_excel('../../other_data/sat_vs_ukv_results.xlsx', header=1).dropna(subset=['sat_lambda']).reset_index(
+df = pd.read_excel('../../other_data/sat_vs_ukv_results.xlsx').reset_index(
     drop=True)
 
 xy_line = [df[['sat_lambda', 'ukv_lambda']].min(axis=None), df[['sat_lambda', 'ukv_lambda']].max(axis=None)]
@@ -17,7 +17,7 @@ for i in df.index:
                  yerr=[
                      [df.ukv_lambda[i] - 2 * np.pi / (2 * np.pi / df.ukv_lambda[i] + 0.1)],
                      [2 * np.pi / (2 * np.pi / df.ukv_lambda[i] - 0.1) - df.ukv_lambda[i]]],
-                 label=f'{df.date[i].date()} {df.region[i]}', marker='o', capsize=3, c=plt.cm.tab20(i))
+                 label=f'{df.date[i]} {df.region[i]}', marker='o', capsize=3, c=plt.cm.tab20(i))
 
 for i in df.index:
     # noinspection PyTypeChecker
@@ -30,6 +30,17 @@ for i in df.index:
                      [2 * np.pi / (2 * np.pi / df.ukv_lambda_newres[i] - 0.05) - df.ukv_lambda_newres[i]]],
                  marker='s', capsize=3, c=plt.cm.tab20(i))
 
+for i in df.index:
+    # noinspection PyTypeChecker
+    plt.errorbar(df.sat_lambda_ellipse[i], df.ukv_lambda_ellipse[i],
+                 xerr=[
+                     [df.sat_lambda_ellipse[i] - 2 * np.pi / (2 * np.pi / df.sat_lambda_ellipse[i] + 0.05)],
+                     [2 * np.pi / (2 * np.pi / df.sat_lambda_ellipse[i] - 0.05) - df.sat_lambda_ellipse[i]]],
+                 yerr=[
+                     [df.ukv_lambda_ellipse[i] - 2 * np.pi / (2 * np.pi / df.ukv_lambda_ellipse[i] + 0.05)],
+                     [2 * np.pi / (2 * np.pi / df.ukv_lambda_ellipse[i] - 0.05) - df.ukv_lambda_ellipse[i]]],
+                 marker='p', capsize=3, c=plt.cm.tab20(i))
+
 plt.legend(loc='upper left')
 plt.xlabel('Satellite wavelength (km)')
 plt.ylabel('UKV wavelength (km)')
@@ -41,9 +52,11 @@ plt.plot(xy_line, xy_line, 'k--', zorder=0)
 
 for i in df.index:
     plt.errorbar(df.sat_theta[i], df.ukv_theta[i], xerr=5, yerr=5,
-                 label=f'{df.date[i].date()} {df.region[i]}', marker='o', capsize=3, c=plt.cm.tab20(i))
+                 label=f'{df.date[i]} {df.region[i]}', marker='o', capsize=3, c=plt.cm.tab20(i))
     plt.errorbar(df.sat_theta_newres[i], df.ukv_theta_newres[i], xerr=5, yerr=5,
                  marker='s', capsize=3, c=plt.cm.tab20(i))
+    plt.errorbar(df.sat_theta_ellipse[i], df.ukv_theta_ellipse[i], xerr=5, yerr=5,
+                 marker='p', capsize=3, c=plt.cm.tab20(i))
 
 plt.legend(loc='lower right')
 plt.xlabel('Satellite wavevector direction from north (deg)')
