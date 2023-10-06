@@ -9,6 +9,7 @@ xy_line = [df[['sat_lambda', 'ukv_lambda']].min(axis=None), df[['sat_lambda', 'u
 plt.plot(xy_line, xy_line, 'k--', zorder=0)
 
 for i in df.index:
+    # noinspection PyTypeChecker
     plt.errorbar(df.sat_lambda[i], df.ukv_lambda[i],
                  xerr=[
                      [df.sat_lambda[i] - 2 * np.pi / (2 * np.pi / df.sat_lambda[i] + 0.1)],
@@ -19,6 +20,7 @@ for i in df.index:
                  label=f'{df.date[i].date()} {df.region[i]}', marker='o', capsize=3, c=plt.cm.tab20(i))
 
 for i in df.index:
+    # noinspection PyTypeChecker
     plt.errorbar(df.sat_lambda_newres[i], df.ukv_lambda_newres[i],
                  xerr=[
                      [df.sat_lambda_newres[i] - 2 * np.pi / (2 * np.pi / df.sat_lambda_newres[i] + 0.05)],
