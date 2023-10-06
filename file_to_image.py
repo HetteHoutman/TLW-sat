@@ -39,7 +39,9 @@ def produce_scene(filename, bottomleft=None, topright=None, grid='latlon'):
         g = pyproj.Geod(ellps='WGS84')
         _, _, Lx = g.inv(bottomleft[0], midy, topright[0], midy)
         _, _, Ly = g.inv(midx, bottomleft[1], midx, topright[1])
-        # TODO i added '+1' below for testing, should remove
+
+        # TODO need to add clause for when x or y is exactly an integer (although might be unlikely...)
+
         x_size = Lx / 1000
         y_size = Ly / 1000
 
