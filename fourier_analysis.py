@@ -8,46 +8,9 @@ from fourier import *
 from fourier_plot import plot_pspec_polar, plot_radial_pspec, plot_2D_pspec, filtered_inv_plot, plot_corr
 from miscellaneous import check_argv_num, load_settings, get_region_var
 from psd import periodic_smooth_decomp
-from skimage.draw import ellipse
 from skimage.transform import rotate
 
 from file_to_image import produce_scene
-
-
-def correlate(a1, b1):
-    a = a1.copy()
-    b = b1.copy()
-
-    assert a.shape == b.shape
-
-    num = np.sum((a - a.mean()) * (b - b.sum()))
-
-    return num
-
-
-def correlate_ellipse(pspec, angles, shape):
-    """shape has to be longer in y direction"""
-    correlation_array = np.zeros_like(pspec.data)
-
-    # loop over elements
-    for iy, ix in np.ndindex(pspec.shape):
-        # only consider points within lambda-range
-        if not pspec.mask[iy, ix]:
-            # rotate according to theta
-            size = max(shape)
-            ell = np.zeros((size, size))
-            ell[ellipse(size // 2, size // 2, *shape, shape=ell.shape, rotation=0)] = 1
-            ell = rotate(ell, -angles[iy, ix], resize=False)
-
-            # select correct sub-matrix around pixel to correlate with
-            half_y_len = ell.shape[0] // 2
-            half_x_len = ell.shape[1] // 2
-            sub_matrix = pspec.data[iy - half_y_len: iy + half_y_len + 1, ix - half_x_len: ix + half_x_len + 1]
-
-            # correlate and assign to pixel
-            correlation_array[iy, ix] = correlate(sub_matrix, ell / ell.sum())
-
-    return np.ma.masked_where(pspec.mask, correlation_array)
 
 
 if __name__ == '__main__':
@@ -210,8 +173,9 @@ if __name__ == '__main__':
     print(f'Dominant wavelength by ellipse method: {dominant_wlen:.2f} km')
     print(f'Dominant angle by ellipse method: {dominant_theta:.0f} deg from north')
 
-    df = pd.read_excel('../../other_data/sat_vs_ukv_results.xlsx', index_col=[0, 1])
-    df.loc[(f'{s.year}-{s.month:02d}-{s.day:02d}', sys.argv[2]), 'sat_lambda_ellipse'] = dominant_wlen
-    df.loc[(f'{s.year}-{s.month:02d}-{s.day:02d}', sys.argv[2]), 'sat_theta_ellipse'] = dominant_theta
-    df.to_excel('../../other_data/sat_vs_ukv_results.xlsx')
+    if not test:
+        df = pd.read_excel('../../other_data/sat_vs_ukv_results.xlsx', index_col=[0, 1])
+        df.loc[(f'{s.year}-{s.month:02d}-{s.day:02d}', sys.argv[2]), 'sat_lambda_ellipse'] = dominant_wlen
+        df.loc[(f'{s.year}-{s.month:02d}-{s.day:02d}', sys.argv[2]), 'sat_theta_ellipse'] = dominant_theta
+        df.to_excel('../../other_data/sat_vs_ukv_results.xlsx')
 
