@@ -30,16 +30,13 @@ def correlate_ellipse(pspec, angles, shape):
     correlation_array = np.zeros_like(pspec.data)
 
     # loop over elements
-    counter = 0
     for iy, ix in np.ndindex(pspec.shape):
         # only consider points within lambda-range
         if not pspec.mask[iy, ix]:
             # rotate according to theta
             size = max(shape)
             ell = np.zeros((size, size))
-            # ell[ellipse(size // 2, size // 2, *shape, shape=ell.shape, rotation=-angles[iy, ix] / 180 * np.pi)] = 1
             ell[ellipse(size // 2, size // 2, *shape, shape=ell.shape, rotation=0)] = 1
-            # ell = np.pad(ellipse(*shape), ((0, 0), (shape[1] - shape[0], shape[1] - shape[0])))
             ell = rotate(ell, -angles[iy, ix], resize=False)
 
             # select correct sub-matrix around pixel to correlate with
@@ -49,15 +46,6 @@ def correlate_ellipse(pspec, angles, shape):
 
             # correlate and assign to pixel
             correlation_array[iy, ix] = correlate(sub_matrix, ell / ell.sum())
-            # num_array[iy, ix], den_array[iy, ix] = correlate(sub_matrix, ell / ell.sum())
-            counter += 1
-
-            if counter == 1000:
-                henk = pspec.data.copy() / pspec.data.max()
-                henk[iy - half_y_len: iy + half_y_len + 1, ix - half_x_len: ix + half_x_len + 1] += (
-                        ell / ell.max())
-                plt.imshow(henk)
-                plt.show()
 
     return np.ma.masked_where(pspec.mask, correlation_array)
 
