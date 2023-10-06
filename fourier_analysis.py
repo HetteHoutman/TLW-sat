@@ -133,21 +133,7 @@ if __name__ == '__main__':
     # plt.show()
     plt.figure()
 
-    np.save(f'data/{my_title}', bounded_polar_pspec)
-
     corr = correlate_ellipse(pspec_2d, thetas, (2, 25))
-    # num, den = correlate_ellipse(pspec_2d, thetas, (2, 30))
-    #
-    # plt.imshow(num)
-    # plt.colorbar()
-    # plt.show()
-    #
-    # plt.imshow(den)
-    # plt.colorbar()
-    # plt.show()
-    #
-    # corr = num / den
-
     rot_left_half = rotate(corr[:, :corr.shape[1] // 2 + 1], 180)
     collapsed_corr = corr[:, corr.shape[1] // 2:] + rot_left_half
 
