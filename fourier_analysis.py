@@ -122,11 +122,13 @@ if __name__ == '__main__':
     # find maximum in correlation array
     dominant_wlen, dominant_theta, dom_K, dom_L = find_corr_max(collapsed_corr, K, L, wavelengths, thetas)
 
+    # plot correlation in array with maximum
     plt.figure()
     plot_corr(collapsed_corr, K, L)
     plt.scatter(dom_K, dom_L, marker='x')
     plt.savefig(save_path + 'corr.png', dpi=300)
 
+    # plot cartesian power spectrum with maximum from ellipse correlation
     plt.figure()
     plot_2D_pspec(pspec_2d, K, L, wavelengths, wavelength_contours=[5, 10, 35], title=my_title)
     plt.scatter(dom_K, dom_L, marker='x')
@@ -136,6 +138,7 @@ if __name__ == '__main__':
     print(f'Dominant wavelength by ellipse method: {dominant_wlen:.2f} km')
     print(f'Dominant angle by ellipse method: {dominant_theta:.0f} deg from north')
 
+    # save results to csv
     if not test:
         df = pd.read_excel('../../other_data/sat_vs_ukv_results.xlsx', index_col=[0, 1])
         df.loc[(f'{s.year}-{s.month:02d}-{s.day:02d}', region), 'sat_lambda_ellipse'] = dominant_wlen
