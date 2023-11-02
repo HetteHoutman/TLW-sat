@@ -15,7 +15,8 @@ from file_to_image import produce_scene
 def get_seviri_img(settings, magnitude_filter=False, stripe_test=False):
     scene, crs = produce_scene(settings.sat_file, bottomleft=sat_bl, topright=sat_tr, grid='km')
     Lx, Ly = extract_distances(scene['HRV'].y[::-1], scene['HRV'].x)
-    orig = np.array(scene['HRV'].data)
+    # divide by 100 to convert from % to 0-1
+    orig = np.array(scene['HRV'].data) / 100
     # orig -= orig.mean()
 
     if magnitude_filter:
@@ -144,4 +145,6 @@ if __name__ == '__main__':
         df.loc[(f'{s.year}-{s.month:02d}-{s.day:02d}', region), 'sat_lambda_ellipse'] = dominant_wlen
         df.loc[(f'{s.year}-{s.month:02d}-{s.day:02d}', region), 'sat_theta_ellipse'] = dominant_theta
         df.to_excel('../../other_data/sat_vs_ukv_results.xlsx')
+
+    np.save(save_path + 'pspec_array.npy', pspec_2d.data)
 
