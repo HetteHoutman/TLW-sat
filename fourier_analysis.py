@@ -36,7 +36,7 @@ if __name__ == '__main__':
     k2 = True
     smoothed = True
     mag_filter = False
-    test = True
+    test = False
     stripe_test = False
 
     min_lambda = 4
@@ -52,7 +52,7 @@ if __name__ == '__main__':
     sat_bounds = get_region_var("sat_bounds", region,
                                 r"C:/Users/sw825517/OneDrive - University of Reading/research/code/tephi_plot/regions/")
     sat_bl, sat_tr = sat_bounds[:2], sat_bounds[2:]
-    my_title, save_path = make_title_and_save_path(datetime, region, 'sat', test, k2, smoothed, mag_filter)
+    my_title, save_path = make_title_and_save_path(datetime, region, 'sat', test, smoothed, mag_filter, k2=k2)
 
     # produce image
     orig, Lx, Ly = get_seviri_img(s, magnitude_filter=mag_filter, stripe_test=stripe_test)
@@ -109,8 +109,8 @@ if __name__ == '__main__':
     plt.tight_layout()
     plt.savefig(save_path + 'polar_pspec.png', dpi=300)
 
-    print(f'Dominant wavelength: {2 * np.pi / dominant_wnum:.2f} km')
-    print(f'Dominant angle: {dominant_theta:.0f} deg from north')
+    print(f'Dominant wavelength by maximum of power spectrum: {2 * np.pi / dominant_wnum:.2f} km')
+    print(f'Dominant angle by maximum of power spectrum: {dominant_theta:.0f} deg from north')
 
     # plot radial power spectrum
     plt.figure()
@@ -122,10 +122,19 @@ if __name__ == '__main__':
 
     # find maximum in correlation array
     dominant_wlen, dominant_theta, dom_K, dom_L = find_corr_max(collapsed_corr, K, L, wavelengths, thetas)
+    dominant_wnum = 2*np.pi/dominant_wlen
+    (lambda_min, lambda_plus), (theta_min, theta_plus) = find_corr_error(collapsed_corr, K, L, 2 * np.pi / dominant_wlen, dominant_theta)
+
+    err_wnums = np.linspace(2*np.pi/lambda_min, 2*np.pi/lambda_plus, 500)
+    err_thetas = np.linspace(theta_min, theta_plus, 500)
 
     # plot correlation in array with maximum
     plt.figure()
     plot_corr(collapsed_corr, K, L)
+    # TODO turn into plot errors function
+    for i in range(len(err_thetas)):
+        plt.scatter(*pol2cart(dominant_wnum, np.deg2rad(-(err_thetas[i] % 180 - 90))), c='k', s=0.5)
+        plt.scatter(*pol2cart(err_wnums[i], np.deg2rad(-dominant_theta+90)), c='k', s=0.5)
     plt.scatter(dom_K, dom_L, marker='x')
     plt.savefig(save_path + 'corr.png', dpi=300)
 
@@ -133,18 +142,45 @@ if __name__ == '__main__':
     plt.figure()
     plot_2D_pspec(pspec_2d, K, L, wavelengths, wavelength_contours=[5, 10, 35], title=my_title)
     plt.scatter(dom_K, dom_L, marker='x')
+    plt.xlim(-2,2)
+    plt.ylim(-2,2)
     plt.savefig(save_path + '2d_pspec_withcross.png', dpi=300)
     plt.close()
 
     print(f'Dominant wavelength by ellipse method: {dominant_wlen:.2f} km')
+    print(f'Dominant wavelength range estimate: {lambda_min:.2f}-{lambda_plus:.2f} km')
     print(f'Dominant angle by ellipse method: {dominant_theta:.0f} deg from north')
+    print(f'Dominant angle range estimate: {theta_min:.0f}-{theta_plus:.0f} deg')
 
     # save results to csv
     if not test:
-        df = pd.read_excel('../../other_data/sat_vs_ukv_results.xlsx', index_col=[0, 1])
-        df.loc[(f'{s.year}-{s.month:02d}-{s.day:02d}', region), 'sat_lambda_ellipse'] = dominant_wlen
-        df.loc[(f'{s.year}-{s.month:02d}-{s.day:02d}', region), 'sat_theta_ellipse'] = dominant_theta
-        df.to_excel('../../other_data/sat_vs_ukv_results.xlsx')
+        csv_root = '../../other_data/fourier_results/'
+        csv_file = 'sat'
+        if k2:
+            csv_file += '_k2'
+        if smoothed:
+            csv_file += '_smoothed'
+
+        csv_file += '_results.csv'
+
+        try:
+            df = pd.read_csv(csv_root + csv_file, index_col=[0, 1, 2])
+        except FileNotFoundError:
+            df = pd.read_csv(csv_root + 'template.csv', index_col=[0, 1, 2])
+
+        df.sort_index(inplace=True)
+        date = f'{s.year}-{s.month:02d}-{s.day:02d}'
+
+        df.loc[(date, region, s.h), 'lambda'] = dominant_wlen
+        df.loc[(date, region, s.h), 'lambda_min'] = lambda_min
+        df.loc[(date, region, s.h), 'lambda_max'] = lambda_plus
+        df.loc[(date, region, s.h), 'theta'] = dominant_theta
+        df.loc[(date, region, s.h), 'theta_min'] = theta_min
+        df.loc[(date, region, s.h), 'theta_max'] = theta_plus
+
+        # sort for clarity if any new dates have been added
+        df.sort_index(inplace=True)
+        df.to_csv(csv_root + csv_file)
 
     np.save(save_path + 'pspec_array.npy', pspec_2d.data)
 
