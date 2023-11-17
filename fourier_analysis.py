@@ -164,12 +164,12 @@ if __name__ == '__main__':
         csv_file += '_results.csv'
 
         try:
-            df = pd.read_csv(csv_root + csv_file, index_col=[0, 1, 2])
+            df = pd.read_csv(csv_root + csv_file, index_col=[0, 1, 2], parse_dates=[0], dayfirst=True)
         except FileNotFoundError:
-            df = pd.read_csv(csv_root + 'template.csv', index_col=[0, 1, 2])
+            df = pd.read_csv(csv_root + 'template.csv', index_col=[0, 1, 2], parse_dates=[0], dayfirst=True)
 
         df.sort_index(inplace=True)
-        date = f'{s.year}-{s.month:02d}-{s.day:02d}'
+        date = pd.to_datetime(f'{s.year}-{s.month:02d}-{s.day:02d}')
 
         df.loc[(date, region, s.h), 'lambda'] = dominant_wlen
         df.loc[(date, region, s.h), 'lambda_min'] = lambda_min
