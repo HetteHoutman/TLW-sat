@@ -17,8 +17,8 @@ file_2 = sys.argv[3]
 filename_2 = file_2.split('/')[-1]
 name_2 = sys.argv[4]
 
-df1 = pd.read_csv(file_1, index_col=[0, 1, 2], parse_dates=[0], dayfirst=True).sort_index()
-df2 = pd.read_csv(file_2, index_col=[0, 1, 2], parse_dates=[0], dayfirst=True).sort_index()
+df1 = pd.read_csv(file_1, index_col=[0, 1, 2], parse_dates=[0]).sort_index()
+df2 = pd.read_csv(file_2, index_col=[0, 1, 2], parse_dates=[0]).sort_index()
 
 df1.sort_index()
 df2.sort_index()
@@ -57,6 +57,14 @@ for i, idx in enumerate(df1.index):
             [df1.loc[idx, 'theta_max'] - df1.loc[idx, 'theta']]]
     yerr = [[df2.loc[idx, 'theta'] - df2.loc[idx, 'theta_min']],
             [df2.loc[idx, 'theta_max'] - df2.loc[idx, 'theta']]]
+
+    # if e.g. dom theta = 7 and lower err = 355, add 360 to diff so that is positive and correct
+    if xerr[0][0] < 0:
+        xerr[0][0] += 360
+
+    if yerr[0][0] < 0:
+        yerr[0][0] += 360
+
     plt.errorbar(df1.loc[idx, 'theta'], df2.loc[idx, 'theta'],
                  xerr=xerr,
                  yerr=yerr,
