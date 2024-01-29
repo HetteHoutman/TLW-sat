@@ -1,6 +1,7 @@
 import sys
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from astropy.convolution import convolve, Gaussian2DKernel
 from fourier import *
@@ -23,7 +24,7 @@ def get_seviri_img(settings, magnitude_filter=False, stripe_test=False):
         orig[(orig > 12) & (orig < 25)] = 6
 
     if stripe_test:
-        orig = stripey_test(orig, Lx, Ly, [10], [15], wiggle=20, wiggle_wavelength=20)
+        orig = stripey_test(orig, Lx, Ly, [10, 30], [15, 100], wiggle=0, wiggle_wavelength=20)
 
     # perform decomposition to remove cross-like signal
     orig, smooth = periodic_smooth_decomp(orig)
@@ -98,23 +99,24 @@ if __name__ == '__main__':
     bounded_polar_pspec, bounded_wnum_vals = apply_wnum_bounds(radial_pspec, wnum_vals, wnum_bins,
                                                                (min_lambda, max_lambda))
 
-    dominant_wnum, dominant_theta = find_max(bounded_polar_pspec, bounded_wnum_vals, theta_vals)
+    # dominant_wnum_max, dominant_theta_max = find_max(bounded_polar_pspec, bounded_wnum_vals, theta_vals)
+    dom_wlen_max, dom_theta_max, dom_K_max, dom_L_max = find_cart_max(pspec_2d, K, L, wavelengths, thetas)
 
     # plot polar power spectrum along with maximum
     plt.figure()
     plot_pspec_polar(wnum_bins, theta_bins, radial_pspec, scale='log', xlim=(0.05, 4.5),
                      vmin=np.nanmin(bounded_polar_pspec), vmax=np.nanmax(bounded_polar_pspec),
                      title=my_title, min_lambda=min_lambda, max_lambda=max_lambda)
-    plt.scatter(dominant_wnum, dominant_theta, marker='x', color='k', s=100, zorder=100)
+    # plt.scatter(dominant_wnum_max, dominant_theta_max, marker='x', color='k', s=100, zorder=100)
     plt.tight_layout()
     plt.savefig(save_path + 'polar_pspec.png', dpi=300)
 
-    print(f'Dominant wavelength by maximum of power spectrum: {2 * np.pi / dominant_wnum:.2f} km')
-    print(f'Dominant angle by maximum of power spectrum: {dominant_theta:.0f} deg from north')
+    print(f'Dominant wavelength by maximum of power spectrum: {dom_wlen_max:.2f} km')
+    print(f'Dominant angle by maximum of power spectrum: {dom_theta_max:.0f} deg from north')
 
     # plot radial power spectrum
     plt.figure()
-    plot_radial_pspec(radial_pspec, wnum_vals, theta_bins, dominant_wnum, title=my_title)
+    plot_radial_pspec(radial_pspec, wnum_vals, theta_bins, 2*np.pi/dom_wlen_max, title=my_title)
     plt.savefig(save_path + 'radial_pspec.png', dpi=300)
 
     # perform correlation with ellipse
@@ -141,7 +143,8 @@ if __name__ == '__main__':
     # plot cartesian power spectrum with maximum from ellipse correlation
     plt.figure()
     plot_2D_pspec(pspec_2d, K, L, wavelengths, wavelength_contours=[5, 10, 35], title=my_title)
-    plt.scatter(dom_K, dom_L, marker='x')
+    plt.scatter(dom_K, dom_L, marker='x', label='ellipse')
+    plt.scatter(dom_K_max, dom_L_max, marker='x', c='k', label='maximum')
     plt.xlim(-2,2)
     plt.ylim(-2,2)
     plt.savefig(save_path + '2d_pspec_withcross.png', dpi=300)
