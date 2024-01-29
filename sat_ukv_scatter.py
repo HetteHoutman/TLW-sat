@@ -58,6 +58,7 @@ for i in df.index:
 plt.legend(loc='best')
 plt.xlabel('Satellite wavelength (km)')
 plt.ylabel('UKV wavelength (km)')
+plt.tight_layout()
 plt.savefig('plots/lambda_comparison.png', dpi=300)
 plt.show()
 
@@ -97,5 +98,6 @@ for i in df.index:
 plt.legend(loc='best')
 plt.xlabel('Satellite wavevector direction from north (deg)')
 plt.ylabel('UKV wavevector direction from north (deg)')
+plt.tight_layout()
 plt.savefig('plots/theta_comparison.png', dpi=300)
 plt.show()
