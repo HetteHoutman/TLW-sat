@@ -66,21 +66,27 @@ for i, idx in enumerate(df1.index):
     yerr = [[(df2.loc[idx, 'theta'] - df2.loc[idx, 'theta_min']) % 180],
             [(df2.loc[idx, 'theta_max'] - df2.loc[idx, 'theta']) % 180]]
 
-    if df1.loc[idx, 'theta_max'] < df1.loc[idx, 'theta']:
-        plt.hlines(df2.loc[idx, 'theta'],  0, df1.loc[idx, 'theta_max'], colors=plt.cm.tab20(i))
-    if df1.loc[idx, 'theta_min'] > df1.loc[idx, 'theta']:
-        plt.hlines(df2.loc[idx, 'theta'],  df1.loc[idx, 'theta_min'], 180, colors=plt.cm.tab20(i))
-
-    if df2.loc[idx, 'theta_max'] < df2.loc[idx, 'theta']:
-        plt.vlines(df1.loc[idx, 'theta'],  0, df2.loc[idx, 'theta_max'], colors=plt.cm.tab20(i))
-    if df2.loc[idx, 'theta_min'] > df2.loc[idx, 'theta']:
-        plt.hlines(df1.loc[idx, 'theta'],  df2.loc[idx, 'theta_min'], 180, colors=plt.cm.tab20(i))
-
     plt.errorbar(df1.loc[idx, 'theta'], df2.loc[idx, 'theta'],
                  xerr=xerr,
                  yerr=yerr,
                  label=f'{idx[0].date()}_{idx[2]}h {idx[1]}',
-                 capsize=0, marker='s', c=plt.cm.tab20(i))
+                 capsize=3, marker='s', c=plt.cm.tab20(i))
+
+    if df1.loc[idx, 'theta_max'] < df1.loc[idx, 'theta']:
+        plt.errorbar(df1.loc[idx, 'theta'] - 180, df2.loc[idx, 'theta'],
+                     xerr=xerr, yerr=yerr, capsize=3, marker='s', c=plt.cm.tab20(i))
+
+    if df1.loc[idx, 'theta_min'] > df1.loc[idx, 'theta']:
+        plt.errorbar(df1.loc[idx, 'theta'] + 180, df2.loc[idx, 'theta'],
+                     xerr=xerr, yerr=yerr, capsize=3, marker='s', c=plt.cm.tab20(i))
+
+    if df2.loc[idx, 'theta_max'] < df2.loc[idx, 'theta']:
+        plt.errorbar(df1.loc[idx, 'theta'], df2.loc[idx, 'theta'] - 180,
+                     xerr=xerr, yerr=yerr, capsize=3, marker='s', c=plt.cm.tab20(i))
+
+    if df2.loc[idx, 'theta_min'] > df2.loc[idx, 'theta']:
+        plt.errorbar(df1.loc[idx, 'theta'], df2.loc[idx, 'theta'] + 180,
+                     xerr=xerr, yerr=yerr, capsize=3, marker='s', c=plt.cm.tab20(i))
 
 plt.legend()
 plt.title(f'{filename_1[:-4]} vs. {filename_2[:-4]}')
