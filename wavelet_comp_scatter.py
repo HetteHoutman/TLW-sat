@@ -23,16 +23,22 @@ df1.sort_index()
 df2.sort_index()
 
 # lambda
-xy_line = [min(df1['lambda'].min(), df2['lambda'].min()),
-           max(df1['lambda'].max(), df2['lambda'].max())]
+xy_line = [min(df1[['lambda', 'lambda_min', 'lambda_max']].min(axis=None), df2[['lambda', 'lambda_min', 'lambda_max']].min(axis=None)),
+           max(df1[['lambda', 'lambda_min', 'lambda_max']].max(axis=None), df2[['lambda', 'lambda_min', 'lambda_max']].max(axis=None))]
 plt.plot(xy_line, xy_line, 'k--', zorder=0)
 
 for i, idx in enumerate(df1.index):
-    plt.scatter(df1.loc[idx, 'lambda'], df2.loc[idx, 'lambda'],
+    xerr = [[df1.loc[idx, 'lambda'] - df1.loc[idx, 'lambda_min']],
+            [df1.loc[idx, 'lambda_max'] - df1.loc[idx, 'lambda']]]
+    yerr = [[df2.loc[idx, 'lambda'] - df2.loc[idx, 'lambda_min']],
+            [df2.loc[idx, 'lambda_max'] - df2.loc[idx, 'lambda']]]
+    plt.errorbar(df1.loc[idx, 'lambda'], df2.loc[idx, 'lambda'],
+                 xerr=xerr,
+                 yerr=yerr,
                  label=f'{idx[0].date()}_{idx[2]}h {idx[1]}',
-                 marker='s', color=plt.cm.tab20(i))
+                 capsize=3, marker='s', c=plt.cm.tab20(i))
 
-plt.legend(loc='lower right')
+plt.legend()
 plt.title(f'{filename_1[:-4]} vs. {filename_2[:-4]}')
 plt.xlabel(f'{name_1} wavelength (km)')
 plt.ylabel(f'{name_2} wavelength (km)')
@@ -48,20 +54,40 @@ plt.savefig(f'plots/wavelet_{filename_1[:-4]}_vs_{filename_2[:-4]}_lambda_compar
 plt.show()
 
 # theta
-xy_line = [min(df1['theta'].min(), df2['theta'].min()),
-           max(df1['theta'].max(), df2['theta'].max())]
+xy_line = [0, 180]
 plt.plot(xy_line, xy_line, 'k--', zorder=0)
 
-for i, idx in enumerate(df1.index):
+overshoot1 = dict()
+overshoot2 = dict()
 
-    plt.scatter(df1.loc[idx, 'theta'], df2.loc[idx, 'theta'],
+for i, idx in enumerate(df1.index):
+    xerr = [[(df1.loc[idx, 'theta'] - df1.loc[idx, 'theta_min']) % 180],
+            [(df1.loc[idx, 'theta_max'] - df1.loc[idx, 'theta']) % 180]]
+    yerr = [[(df2.loc[idx, 'theta'] - df2.loc[idx, 'theta_min']) % 180],
+            [(df2.loc[idx, 'theta_max'] - df2.loc[idx, 'theta']) % 180]]
+
+    if df1.loc[idx, 'theta_max'] < df1.loc[idx, 'theta']:
+        plt.hlines(df2.loc[idx, 'theta'],  0, df1.loc[idx, 'theta_max'], colors=plt.cm.tab20(i))
+    if df1.loc[idx, 'theta_min'] > df1.loc[idx, 'theta']:
+        plt.hlines(df2.loc[idx, 'theta'],  df1.loc[idx, 'theta_min'], 180, colors=plt.cm.tab20(i))
+
+    if df2.loc[idx, 'theta_max'] < df2.loc[idx, 'theta']:
+        plt.vlines(df1.loc[idx, 'theta'],  0, df2.loc[idx, 'theta_max'], colors=plt.cm.tab20(i))
+    if df2.loc[idx, 'theta_min'] > df2.loc[idx, 'theta']:
+        plt.hlines(df1.loc[idx, 'theta'],  df2.loc[idx, 'theta_min'], 180, colors=plt.cm.tab20(i))
+
+    plt.errorbar(df1.loc[idx, 'theta'], df2.loc[idx, 'theta'],
+                 xerr=xerr,
+                 yerr=yerr,
                  label=f'{idx[0].date()}_{idx[2]}h {idx[1]}',
-                 marker='s', color=plt.cm.tab20(i))
+                 capsize=0, marker='s', c=plt.cm.tab20(i))
 
 plt.legend()
 plt.title(f'{filename_1[:-4]} vs. {filename_2[:-4]}')
 plt.xlabel(f'{name_1} wavevector direction from north (deg)')
 plt.ylabel(f'{name_2} wavevector direction from north (deg)')
+plt.xlim(0, 180)
+plt.ylim(0, 180)
 plt.tight_layout()
 plt.savefig(f'plots/wavelet_{filename_1[:-4]}_vs_{filename_2[:-4]}_theta_comparison.png', dpi=300)
 plt.show()
