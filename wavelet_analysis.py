@@ -1,4 +1,3 @@
-import numpy as np
 import pandas as pd
 import py_cwt2d
 from fourier import *
@@ -29,7 +28,7 @@ def get_seviri_img(settings, sat_bl, sat_tr, stripe_test=False):
 
 if __name__ == '__main__':
     # options
-    test = False
+    test = True
     stripe_test = False
 
     lambda_min = 5
@@ -37,7 +36,8 @@ if __name__ == '__main__':
     lambda_bin_width = 1
     theta_bin_width = 5
     omega_0x = 6
-    # pspec_threshold = 3e-4
+    # pspec_threshold = 5e-5
+    # pspec_threshold = 1e-3
     pspec_threshold = 1e-2
     block_size = 51
 
@@ -58,12 +58,14 @@ if __name__ == '__main__':
 
     # normalise orig image
     orig /= orig.max()
-    # orig = exposure.equalize_hist(orig)
-    orig = orig > threshold_local(orig, block_size)
+    # orig = exposure.equalize_adapthist(orig)
+    orig = orig > threshold_local(orig, block_size, method='gaussian')
+    # orig = gaussian(laplace(orig))
 
     # lambdas, lambdas_edges = create_range_and_bin_edges_from_minmax([lambda_min, lambda_max],
     #                                                                 lambda_max - lambda_min + 1)
-    lambdas, lambdas_edges = log_spaced_lambda([lambda_min, lambda_max], 1.075)
+    # lambdas, lambdas_edges = log_spaced_lambda([lambda_min, lambda_max], 1.075)
+    lambdas, lambdas_edges = k_spaced_lambda([lambda_min, lambda_max], 40)
     thetas = np.arange(0, 180, theta_bin_width)
     thetas_edges = create_bins_from_midpoints(thetas)
     scales = omega_0x * lambdas / (2 * np.pi)
@@ -93,13 +95,9 @@ if __name__ == '__main__':
     strong_hist_smoothed = gaussian(np.tile(strong_hist, 3))[:, strong_hist.shape[1]:strong_hist.shape[1] * 2]
     max_hist_smoothed = gaussian(np.tile(max_hist, 3))[:, max_hist.shape[1]:max_hist.shape[1] * 2]
 
-    # determine maximum in smoothed image
-    idxs = np.unravel_index(strong_hist_smoothed.argmax(), strong_hist_smoothed.shape)
-    result_lambda, result_theta = lambdas[idxs[0]], thetas[idxs[1]]
-
-    # avg max
-    avg_idxs = np.unravel_index(avg_pspec.argmax(), avg_pspec.shape)
-    henk_lambda, henk_theta = lambdas[avg_idxs[0]], thetas[avg_idxs[1]]
+    # determine maximum in smoothed histogram
+    lambda_selected, theta_selected, lambda_bounds, theta_bounds = find_polar_max_and_error(strong_hist_smoothed,
+                                                                                            lambdas, thetas)
 
     # plot images
     # TODO for some reason a negative value/level is sometimes passed to colorbar here
@@ -124,12 +122,12 @@ if __name__ == '__main__':
     plt.show()
 
     plot_k_histogram(strong_lambdas, strong_thetas, lambdas_edges, thetas_edges)
-    plt.scatter(result_lambda, result_theta, marker='x', color='k')
+    plt.scatter(lambda_selected, theta_selected, marker='x', color='k')
     plt.savefig(save_path + 'wavelet_k_histogram_full_pspec.png', dpi=300)
     plt.show()
 
     plot_polar_pcolormesh(strong_hist, lambdas_edges, thetas_edges, cbarlabel='Dominant wavelet count')
-    plt.scatter(np.deg2rad(result_theta), result_lambda, marker='x', color='k')
+    plt.scatter(np.deg2rad(theta_selected), lambda_selected, marker='x', color='k')
     plt.savefig(save_path + 'wavelet_k_histogram_strong_pspec_polar.png', dpi=300)
     plt.show()
 
@@ -154,24 +152,12 @@ if __name__ == '__main__':
         df.sort_index(inplace=True)
         date = pd.to_datetime(f'{s.year}-{s.month:02d}-{s.day:02d}')
 
-        df.loc[(date, region, s.h), 'lambda'] = result_lambda
-        df.loc[(date, region, s.h), 'theta'] = result_theta
-
-        df.sort_index(inplace=True)
-        df.to_csv(csv_root + csv_file)
-
-        csv_file = f'sat_test.csv'
-
-        try:
-            df = pd.read_csv(csv_root + csv_file, index_col=[0, 1, 2], parse_dates=[0], dayfirst=True)
-        except FileNotFoundError:
-            df = pd.read_csv(csv_root + 'template.csv', index_col=[0, 1, 2], parse_dates=[0], dayfirst=True)
-
-        df.sort_index(inplace=True)
-        date = pd.to_datetime(f'{s.year}-{s.month:02d}-{s.day:02d}')
-
-        df.loc[(date, region, s.h), 'lambda'] = henk_lambda
-        df.loc[(date, region, s.h), 'theta'] = henk_theta
+        df.loc[(date, region, s.h), 'lambda'] = lambda_selected
+        df.loc[(date, region, s.h), 'lambda_min'] = lambda_bounds[0]
+        df.loc[(date, region, s.h), 'lambda_max'] = lambda_bounds[1]
+        df.loc[(date, region, s.h), 'theta'] = theta_selected
+        df.loc[(date, region, s.h), 'theta_min'] = theta_bounds[0]
+        df.loc[(date, region, s.h), 'theta_max'] = theta_bounds[1]
 
         df.sort_index(inplace=True)
         df.to_csv(csv_root + csv_file)
