@@ -5,8 +5,6 @@ import pandas as pd
 from matplotlib.ticker import StrMethodFormatter
 from miscellaneous import check_argv_num
 
-# TODO extend to multiple files? or ukv vs ukv_radsim etc.
-
 check_argv_num(sys.argv, 4, '(results file 1, results file 1 name, results file 2, results file 2 name)')
 file_1 = sys.argv[1]
 filename_1 = file_1.split('/')[-1]
