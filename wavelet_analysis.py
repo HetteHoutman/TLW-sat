@@ -1,13 +1,14 @@
 import pandas as pd
 import py_cwt2d
+from prepare_metadata import get_variable_from_region_json
+from skimage.filters import gaussian, threshold_local
+
+from file_to_image import produce_scene
 from fourier import *
 from miscellaneous import *
 from psd import periodic_smooth_decomp
-from skimage.filters import gaussian, threshold_local
 from wavelet import *
 from wavelet_plot import *
-
-from file_to_image import produce_scene
 
 
 def get_seviri_img(settings, sat_bl, sat_tr, stripe_test=False):
@@ -28,7 +29,7 @@ def get_seviri_img(settings, sat_bl, sat_tr, stripe_test=False):
 
 if __name__ == '__main__':
     # options
-    test = True
+    test = False
     stripe_test = False
 
     lambda_min = 5
@@ -36,8 +37,6 @@ if __name__ == '__main__':
     lambda_bin_width = 1
     theta_bin_width = 5
     omega_0x = 6
-    # pspec_threshold = 5e-5
-    # pspec_threshold = 1e-3
     pspec_threshold = 1e-2
     block_size = 51
 
@@ -46,7 +45,7 @@ if __name__ == '__main__':
     s = load_settings(sys.argv[1])
     datetime = get_datetime_from_settings(s)
     region = sys.argv[2]
-    sat_bounds = get_region_var("sat_bounds", region,
+    sat_bounds = get_variable_from_region_json("sat_bounds", region,
                                 r"C:/Users/sw825517/OneDrive - University of Reading/research/code/tephi_plot/regions/")
     sat_bl, sat_tr = sat_bounds[:2], sat_bounds[2:]
     save_path = f'./plots/{datetime}/{region}/51_'
@@ -58,13 +57,8 @@ if __name__ == '__main__':
 
     # normalise orig image
     orig /= orig.max()
-    # orig = exposure.equalize_adapthist(orig)
     orig = orig > threshold_local(orig, block_size, method='gaussian')
-    # orig = gaussian(laplace(orig))
 
-    # lambdas, lambdas_edges = create_range_and_bin_edges_from_minmax([lambda_min, lambda_max],
-    #                                                                 lambda_max - lambda_min + 1)
-    # lambdas, lambdas_edges = log_spaced_lambda([lambda_min, lambda_max], 1.075)
     lambdas, lambdas_edges = k_spaced_lambda([lambda_min, lambda_max], 40)
     thetas = np.arange(0, 180, theta_bin_width)
     thetas_edges = create_bins_from_midpoints(thetas)
@@ -145,9 +139,9 @@ if __name__ == '__main__':
         csv_file = f'sat_adapt_thresh_{block_size}.csv'
 
         try:
-            df = pd.read_csv(csv_root + csv_file, index_col=[0, 1, 2], parse_dates=[0], dayfirst=True)
+            df = pd.read_csv(csv_root + csv_file, index_col=[0, 1, 2], parse_dates=[0])
         except FileNotFoundError:
-            df = pd.read_csv(csv_root + 'template.csv', index_col=[0, 1, 2], parse_dates=[0], dayfirst=True)
+            df = pd.read_csv(csv_root + 'template.csv', index_col=[0, 1, 2], parse_dates=[0])
 
         df.sort_index(inplace=True)
         date = pd.to_datetime(f'{s.year}-{s.month:02d}-{s.day:02d}')
