@@ -1,6 +1,9 @@
+import datetime as dt
+import glob
+
 import pandas as pd
 import py_cwt2d
-from prepare_metadata import get_variable_from_region_json
+from prepare_metadata import get_sat_map_bltr
 from skimage.filters import gaussian, threshold_local
 
 from file_to_image import produce_scene
@@ -11,8 +14,19 @@ from wavelet import *
 from wavelet_plot import *
 
 
-def get_seviri_img(settings, sat_bl, sat_tr, stripe_test=False):
-    scene, crs = produce_scene(settings.sat_file, bottomleft=sat_bl, topright=sat_tr, grid='km')
+def find_sat_file(root):
+    return glob.glob('*.nat', root_dir=root)[0]
+
+
+def get_seviri_img(datetime, region, stripe_test=False,
+                   data_root="C:\\Users\\sw825517\\OneDrive - University of Reading\\research\\code\\eumetsat\\data\\"):
+
+    sat_file_root = data_root + datetime.strftime("%Y-%m-%d_%H") + '/'
+    sat_file = find_sat_file(sat_file_root)
+
+    sat_bl, sat_tr, _, _ = get_sat_map_bltr(region, region_root='../tephi_plot/regions/')
+
+    scene, crs = produce_scene(sat_file_root + sat_file, bottomleft=sat_bl, topright=sat_tr, grid='km')
     Lx, Ly = extract_distances(scene['HRV'].y[::-1], scene['HRV'].x)
 
     # divide by 100 to convert from % to 0-1
@@ -41,22 +55,19 @@ if __name__ == '__main__':
     block_size = 51
 
     # settings
-    check_argv_num(sys.argv, 2, "(settings, region json files)")
-    s = load_settings(sys.argv[1])
-    datetime = get_datetime_from_settings(s)
+    check_argv_num(sys.argv, 2, "(datetime (YYYY-MM-DD_HH), region)")
+    datetime_string = sys.argv[1]
+    datetime = dt.datetime.strptime(datetime_string, '%Y-%m-%d_%H')
     region = sys.argv[2]
-    sat_bounds = get_variable_from_region_json("sat_bounds", region,
-                                r"C:/Users/sw825517/OneDrive - University of Reading/research/code/tephi_plot/regions/")
-    sat_bl, sat_tr = sat_bounds[:2], sat_bounds[2:]
-    save_path = f'./plots/{datetime}/{region}/51_'
+
+    save_path = f'./plots/{datetime_string}/{region}/51_'
     if test:
         save_path = f'./plots/test/'
 
     # produce image
-    orig, Lx, Ly = get_seviri_img(s, sat_bl, sat_tr, stripe_test=stripe_test)
+    orig, Lx, Ly = get_seviri_img(datetime, region, stripe_test=stripe_test)
 
-    # normalise orig image
-    orig /= orig.max()
+    # enhance image
     orig = orig > threshold_local(orig, block_size, method='gaussian')
 
     lambdas, lambdas_edges = k_spaced_lambda([lambda_min, lambda_max], 40)
@@ -144,14 +155,13 @@ if __name__ == '__main__':
             df = pd.read_csv(csv_root + 'template.csv', index_col=[0, 1, 2], parse_dates=[0])
 
         df.sort_index(inplace=True)
-        date = pd.to_datetime(f'{s.year}-{s.month:02d}-{s.day:02d}')
 
-        df.loc[(date, region, s.h), 'lambda'] = lambda_selected
-        df.loc[(date, region, s.h), 'lambda_min'] = lambda_bounds[0]
-        df.loc[(date, region, s.h), 'lambda_max'] = lambda_bounds[1]
-        df.loc[(date, region, s.h), 'theta'] = theta_selected
-        df.loc[(date, region, s.h), 'theta_min'] = theta_bounds[0]
-        df.loc[(date, region, s.h), 'theta_max'] = theta_bounds[1]
+        df.loc[(str(datetime.date()), region, datetime.hour), 'lambda'] = lambda_selected
+        df.loc[(str(datetime.date()), region, datetime.hour), 'lambda_min'] = lambda_bounds[0]
+        df.loc[(str(datetime.date()), region, datetime.hour), 'lambda_max'] = lambda_bounds[1]
+        df.loc[(str(datetime.date()), region, datetime.hour), 'theta'] = theta_selected
+        df.loc[(str(datetime.date()), region, datetime.hour), 'theta_min'] = theta_bounds[0]
+        df.loc[(str(datetime.date()), region, datetime.hour), 'theta_max'] = theta_bounds[1]
 
         df.sort_index(inplace=True)
         df.to_csv(csv_root + csv_file)
