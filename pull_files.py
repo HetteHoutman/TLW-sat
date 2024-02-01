@@ -14,13 +14,11 @@ import shutil
 import pandas as pd
 import os
 
-df = pd.read_excel('../../other_data/list_of_cases.xlsx')
-dates = pd.to_datetime(
-    df.dates[df.selected == 'x'].astype('str') + ' ' + df.h[df.selected == 'x'].astype('int').astype('str')).values
+df = pd.read_excel('../../other_data/list_of_cases.xlsx', parse_dates=[0])
+datetimes = [date.replace(hour=hour) for date, hour in zip(df.dates[df.selected == 'x'], df.h[df.selected == 'x'])]
 ddir = r"C:\Users\sw825517\OneDrive - University of Reading\research\code\eumetsat"
 
-for start in dates:
-    # start = datetime.datetime(2023, 5, 30, 10, 45)
+for start in datetimes:
     dt = np.timedelta64(15, 'm')
 
     # Retrieve datasets that match our filter
@@ -31,16 +29,19 @@ for start in dates:
     for product in products:
         print(str(product))
 
-        if os.path.exists('data/' + str(product)):
+        if os.path.exists('data/' + start.strftime('%Y-%m-%d_%H')):
             continue
         else:
-            os.makedirs('data/' + str(product))
+            os.makedirs('data/' + start.strftime('%Y-%m-%d_%H'))
 
         with product.open() as fsrc, \
                 open(fsrc.name, mode='wb') as fdst:
             shutil.copyfileobj(fsrc, fdst)
             print(f'Download of product {product} finished.')
             print(f'Unpacking {fdst.name}')
-            shutil.unpack_archive(fdst.name, extract_dir=ddir + '/data/' + fdst.name[:-4])
+            shutil.unpack_archive(fdst.name, extract_dir=ddir + '/data/' + start.strftime('%Y-%m-%d_%H'))
+
+        os.remove(fdst.name)
+        print(f'Removed {fdst.name}')
 
 print('All downloads are finished.')
