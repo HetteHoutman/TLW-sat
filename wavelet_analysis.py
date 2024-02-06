@@ -3,15 +3,14 @@ import glob
 
 import pandas as pd
 import py_cwt2d
-from prepare_metadata import get_sat_map_bltr
-from skimage.filters import gaussian, threshold_local
-
-from file_to_image import produce_scene
 from fourier import *
 from miscellaneous import *
-from psd import periodic_smooth_decomp
+from prepare_metadata import get_sat_map_bltr
+from skimage.filters import gaussian, threshold_local
 from wavelet import *
 from wavelet_plot import *
+
+from file_to_image import produce_scene
 
 
 def find_sat_file(root):
@@ -35,9 +34,6 @@ def get_seviri_img(datetime, region, stripe_test=False,
     if stripe_test:
         orig = stripey_test(orig, Lx, Ly, [10, 30], [15, 100], wiggle=0, wiggle_wavelength=20)
 
-    # perform decomposition to remove cross-like signal
-    orig, smooth = periodic_smooth_decomp(orig)
-
     return orig, Lx, Ly
 
 
@@ -60,7 +56,7 @@ if __name__ == '__main__':
     datetime = dt.datetime.strptime(datetime_string, '%Y-%m-%d_%H')
     region = sys.argv[2]
 
-    save_path = f'./plots/{datetime_string}/{region}/51_'
+    save_path = f'./plots/{datetime_string}/{region}/51_nodecomp'
     if test:
         save_path = f'./plots/test/'
 
@@ -147,7 +143,7 @@ if __name__ == '__main__':
     # save results
     if not test:
         csv_root = '../../other_data/wavelet_results/'
-        csv_file = f'sat_adapt_thresh_{block_size}.csv'
+        csv_file = f'sat_adapt_thresh_{block_size}_nodecomp.csv'
 
         try:
             df = pd.read_csv(csv_root + csv_file, index_col=[0, 1, 2], parse_dates=[0])
