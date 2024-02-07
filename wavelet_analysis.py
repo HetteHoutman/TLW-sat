@@ -56,7 +56,11 @@ if __name__ == '__main__':
     datetime = dt.datetime.strptime(datetime_string, '%Y-%m-%d_%H')
     region = sys.argv[2]
 
-    save_path = f'./plots/{datetime_string}/{region}/51_nodecomp'
+    save_path = f'./plots/{datetime_string}/{region}/'
+
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+
     if test:
         save_path = f'./plots/test/'
 
@@ -105,40 +109,40 @@ if __name__ == '__main__':
     plot_contour_over_image(orig, max_pspec, Lx, Ly, cbarlabel='Maximum of wavelet power spectrum',
                             alpha=0.5, norm='log')
     plt.savefig(save_path + 'wavelet_pspec_max.png', dpi=300)
-    plt.show()
+    plt.close()
 
     plot_contour_over_image(orig, max_lambdas, Lx, Ly, cbarlabel='Dominant wavelength (km)',
                             alpha=0.5)
     plt.savefig(save_path + 'wavelet_dom_lambda.png', dpi=300)
-    plt.show()
+    plt.close()
 
     plot_contour_over_image(orig, max_thetas, Lx, Ly, cbarlabel='Dominant orientation (degrees from North)',
                             alpha=0.5)
     plt.savefig(save_path + 'wavelet_dom_theta.png', dpi=300)
-    plt.show()
+    plt.close()
 
     # plot histograms
     plot_k_histogram(max_lambdas[~max_pspec.mask], max_thetas[~max_pspec.mask], lambdas_edges, thetas_edges)
     plt.savefig(save_path + 'wavelet_k_histogram_max.png', dpi=300)
-    plt.show()
+    plt.close()
 
     plot_k_histogram(strong_lambdas, strong_thetas, lambdas_edges, thetas_edges)
     plt.scatter(lambda_selected, theta_selected, marker='x', color='k')
     plt.savefig(save_path + 'wavelet_k_histogram_full_pspec.png', dpi=300)
-    plt.show()
+    plt.close()
 
     plot_polar_pcolormesh(strong_hist, lambdas_edges, thetas_edges, cbarlabel='Dominant wavelet count')
     plt.scatter(np.deg2rad(theta_selected), lambda_selected, marker='x', color='k')
     plt.savefig(save_path + 'wavelet_k_histogram_strong_pspec_polar.png', dpi=300)
-    plt.show()
+    plt.close()
 
     plot_polar_pcolormesh(max_hist, lambdas_edges, thetas_edges, cbarlabel='Dominant wavelet count')
     plt.savefig(save_path + 'wavelet_k_histogram_max_pspec_polar.png', dpi=300)
-    plt.show()
+    plt.close()
 
     plot_polar_pcolormesh(avg_pspec, lambdas_edges, thetas_edges, cbarlabel='Average power spectrum')
     plt.savefig(save_path + 'wavelet_average_pspec.png', dpi=300)
-    plt.show()
+    plt.close()
 
     # save results
     if not test:
