@@ -54,7 +54,7 @@ ax.yaxis.set_minor_formatter(StrMethodFormatter('{x:.0f}'))
 ax.xaxis.set_major_formatter(StrMethodFormatter('{x:.0f}'))
 ax.xaxis.set_minor_formatter(StrMethodFormatter('{x:.0f}'))
 plt.tight_layout()
-plt.savefig(f'plots/wavelet_{filename_1[:-4]}_vs_{filename_2[:-4]}_lambda_comparison.png', dpi=300)
+plt.savefig(f'plots/results/wavelet_{filename_1[:-4]}_vs_{filename_2[:-4]}_lambda_comparison.png', dpi=300)
 plt.show()
 
 lambdas, lambdas_edges = k_spaced_lambda([5, 35], 40)
