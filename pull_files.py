@@ -15,7 +15,6 @@ import pandas as pd
 import os
 
 df = pd.read_excel('../../other_data/list_of_cases.xlsx', parse_dates=[0])
-df.h.fillna(12, inplace=True)
 df.h = df.h.astype('int')
 datetimes = [date.replace(hour=hour) for date, hour in zip(df.dates, df.h)]
 ddir = r"C:\Users\sw825517\OneDrive - University of Reading\research\code\eumetsat"
@@ -23,29 +22,36 @@ ddir = r"C:\Users\sw825517\OneDrive - University of Reading\research\code\eumets
 for start in datetimes:
     if start.year == 2023:
         dt = np.timedelta64(15, 'm')
+        dir_name = 'data/' + start.strftime('%Y-%m-%d_%H')
 
-        # Retrieve datasets that match our filter
-        products = selected_collection.search(
-            dtstart=start,
-            dtend=start + dt)
+        if os.path.exists(dir_name):
+            continue
+        else:
+            os.makedirs(dir_name)
 
-        for product in products:
-            print(str(product))
+        if not os.listdir(dir_name):
+            print(f"Directory {dir_name} is empty")
 
-            if os.path.exists('data/' + start.strftime('%Y-%m-%d_%H')):
-                continue
-            else:
-                os.makedirs('data/' + start.strftime('%Y-%m-%d_%H'))
+            # Retrieve datasets that match our filter
+            products = selected_collection.search(
+                dtstart=start,
+                dtend=start + dt)
 
-            with product.open() as fsrc, \
-                    open(fsrc.name, mode='wb') as fdst:
-                shutil.copyfileobj(fsrc, fdst)
-                print(f'Download of product {product} finished.')
-                print(f'Unpacking {fdst.name}')
-                shutil.unpack_archive(fdst.name, extract_dir=ddir + '/data/' + start.strftime('%Y-%m-%d_%H'))
+            for product in products:
+                print(str(product))
 
-            os.remove(fdst.name)
-            print(f'Removed {fdst.name}')
+                with product.open() as fsrc, \
+                        open(fsrc.name, mode='wb') as fdst:
+                    shutil.copyfileobj(fsrc, fdst)
+                    print(f'Download of product {product} finished.')
+                    print(f'Unpacking {fdst.name}')
+                    shutil.unpack_archive(fdst.name, extract_dir=ddir + '/data/' + start.strftime('%Y-%m-%d_%H'))
+
+                os.remove(fdst.name)
+                print(f'Removed {fdst.name}')
+
+        else:
+            pass
     else:
         pass
 
