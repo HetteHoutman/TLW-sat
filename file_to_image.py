@@ -5,13 +5,11 @@ import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
 import numpy as np
 import pyproj
-from miscellaneous import make_great_circle_points, check_argv_num, load_settings, get_region_var
-
+from miscellaneous import make_great_circle_points, check_argv_num, load_settings
+from prepare_metadata import get_variable_from_region_json
 from pyresample import get_area_def
 from satpy import Scene
 from satpy.writers import get_enhanced_image
-
-from sonde_locs import sonde_locs
 
 
 def produce_scene(filename, bottomleft=None, topright=None, grid='latlon'):
@@ -103,7 +101,7 @@ if __name__ == '__main__':
     # check argument number and load settings
     check_argv_num(sys.argv, 2, "(settings, region json files)")
     s = load_settings(sys.argv[1])
-    sat_bounds = get_region_var("sat_bounds", sys.argv[2],
+    sat_bounds = get_variable_from_region_json("sat_bounds", sys.argv[2],
                                 r"C:/Users/sw825517/OneDrive - University of Reading/research/code/tephi_plot/regions/")
 
     sat_bl, sat_tr = sat_bounds[:2], sat_bounds[2:]

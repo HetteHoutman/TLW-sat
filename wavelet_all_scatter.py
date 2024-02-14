@@ -6,6 +6,7 @@ import pandas as pd
 from matplotlib.ticker import StrMethodFormatter
 from miscellaneous import check_argv_num, k_spaced_lambda, create_bins_from_midpoints
 from wavelet_plot import plot_result_lambda_hist
+from wavelet import angle_error
 
 # prepare data
 check_argv_num(sys.argv, 4, '(results file 1, results file 1 name, results file 2, results file 2 name)')
@@ -118,4 +119,34 @@ plt.xlabel(f'{name_1} wavevector direction from north (deg)')
 plt.ylabel(f'{name_2} wavevector direction from north (deg)')
 plt.tight_layout()
 plt.savefig(f'plots/results/wavelet_{filename_1[:-4]}_vs_{filename_2[:-4]}_theta_comparison_hist.png', dpi=300)
+plt.show()
+
+#df.reset_index()['date'].dt.month.value_counts().sort_index().plot(kind='bar')
+# df.reset_index()['region'].value_counts().plot(kind='bar')
+
+df['lambda_diff'] = df[f'lambda_{name_1}'] - df[f'lambda_{name_2}']
+df['theta_diff'] = angle_error(df[f'theta_{name_1}'], df[f'theta_{name_2}'])
+
+plt.scatter(df['lambda_diff']/df[f'lambda_{name_1}'], df['theta_diff'])
+plt.xlabel(f'(lambda_{name_1} - lambda_{name_2}) / lambda_{name_1}')
+plt.ylabel(f'theta_{name_1} - theta_{name_2} (deg)')
+plt.tight_layout()
+plt.show()
+
+plt.hist2d(df['lambda_diff']/df[f'lambda_{name_1}'], df['theta_diff'], bins=[40, 36])
+plt.xlabel(f'(lambda_{name_1} - lambda_{name_2}) / lambda_{name_1}')
+plt.ylabel(f'theta_{name_1} - theta_{name_2} (deg)')
+plt.tight_layout()
+plt.show()
+
+plt.hist2d(abs(df['lambda_diff']/df[f'lambda_{name_1}']), abs(df['theta_diff']), bins=[40, 18])
+plt.xlabel(f'(lambda_{name_1} - lambda_{name_2}) / lambda_{name_1}')
+plt.ylabel(f'theta_{name_1} - theta_{name_2} (deg)')
+plt.tight_layout()
+plt.show()
+
+plt.hist2d(df['lambda_diff']/df[f'lambda_{name_1}'], abs(df['theta_diff']), bins=[40, 18])
+plt.xlabel(f'(lambda_{name_1} - lambda_{name_2}) / lambda_{name_1}')
+plt.ylabel(f'theta_{name_1} - theta_{name_2} (deg)')
+plt.tight_layout()
 plt.show()

@@ -25,7 +25,7 @@ xy_line = [min(df1[['lambda', 'lambda_min', 'lambda_max']].min(axis=None), df2[[
            max(df1[['lambda', 'lambda_min', 'lambda_max']].max(axis=None), df2[['lambda', 'lambda_min', 'lambda_max']].max(axis=None))]
 plt.plot(xy_line, xy_line, 'k--', zorder=0)
 
-for i, idx in enumerate(df1.index):
+for i, idx in enumerate(df2.index):
     xerr = [[df1.loc[idx, 'lambda'] - df1.loc[idx, 'lambda_min']],
             [df1.loc[idx, 'lambda_max'] - df1.loc[idx, 'lambda']]]
     yerr = [[df2.loc[idx, 'lambda'] - df2.loc[idx, 'lambda_min']],
@@ -58,7 +58,7 @@ plt.plot(xy_line, xy_line, 'k--', zorder=0)
 overshoot1 = dict()
 overshoot2 = dict()
 
-for i, idx in enumerate(df1.index):
+for i, idx in enumerate(df2.index):
     xerr = [[(df1.loc[idx, 'theta'] - df1.loc[idx, 'theta_min']) % 180],
             [(df1.loc[idx, 'theta_max'] - df1.loc[idx, 'theta']) % 180]]
     yerr = [[(df2.loc[idx, 'theta'] - df2.loc[idx, 'theta_min']) % 180],
