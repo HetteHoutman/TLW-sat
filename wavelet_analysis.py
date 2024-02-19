@@ -18,12 +18,12 @@ def find_sat_file(root):
 
 
 def get_seviri_img(datetime, region, stripe_test=False,
-                   data_root="C:\\Users\\sw825517\\OneDrive - University of Reading\\research\\code\\eumetsat\\data\\"):
+                   data_root="/storage/silver/metstudent/phd/sw825517/seviri_data/"):
 
     sat_file_root = data_root + datetime.strftime("%Y-%m-%d_%H") + '/'
     sat_file = find_sat_file(sat_file_root)
 
-    sat_bl, sat_tr, _, _ = get_sat_map_bltr(region, region_root='../tephi_plot/regions/')
+    sat_bl, sat_tr, _, _ = get_sat_map_bltr(region, region_root='../tephiplot/regions/')
 
     scene, crs = produce_scene(sat_file_root + sat_file, bottomleft=sat_bl, topright=sat_tr, grid='km')
     Lx, Ly = extract_distances(scene['HRV'].y[::-1], scene['HRV'].x)
@@ -42,13 +42,14 @@ if __name__ == '__main__':
     test = False
     stripe_test = False
 
-    lambda_min = 5
+    lambda_min = 3
     lambda_max = 35
-    lambda_bin_width = 1
     theta_bin_width = 5
     omega_0x = 6
     pspec_threshold = 1e-2
+
     block_size = 51
+    n_lambda = 60
 
     # settings
     check_argv_num(sys.argv, 2, "(datetime (YYYY-MM-DD_HH), region)")
@@ -70,7 +71,7 @@ if __name__ == '__main__':
     # enhance image
     orig = orig > threshold_local(orig, block_size, method='gaussian')
 
-    lambdas, lambdas_edges = k_spaced_lambda([lambda_min, lambda_max], 40)
+    lambdas, lambdas_edges = k_spaced_lambda([lambda_min, lambda_max], n_lambda)
     thetas = np.arange(0, 180, theta_bin_width)
     thetas_edges = create_bins_from_midpoints(thetas)
     scales = omega_0x * lambdas / (2 * np.pi)
@@ -146,8 +147,8 @@ if __name__ == '__main__':
 
     # save results
     if not test:
-        csv_root = '../../other_data/wavelet_results/'
-        csv_file = f'sat_adapt_thresh_{block_size}_nodecomp.csv'
+        csv_root = '../tephiplot/wavelet_results/'
+        csv_file = f'sat_adapt_thresh_{block_size}.csv'
 
         try:
             df = pd.read_csv(csv_root + csv_file, index_col=[0, 1, 2], parse_dates=[0])
@@ -165,3 +166,12 @@ if __name__ == '__main__':
 
         df.sort_index(inplace=True)
         df.to_csv(csv_root + csv_file)
+
+        # data_root = f'/storage/silver/metstudent/phd/sw825517/sat_pspecs/{datetime.strftime("%Y-%m-%d_%H")}/{region}/'
+        # if not os.path.exists(data_root):
+        #     os.makedirs(data_root)
+        # np.save(data_root + 'pspec.npy', pspec.data)
+        # np.save(data_root + 'lambdas.npy', lambdas)
+        # np.save(data_root + 'thetas.npy', thetas)
+        # np.save(data_root + 'threshold.npy', [pspec_threshold])
+        # np.save(data_root + 'histogram.npy', strong_hist)
