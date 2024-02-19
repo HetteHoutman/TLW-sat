@@ -5,8 +5,11 @@ import numpy as np
 import pandas as pd
 from matplotlib.ticker import StrMethodFormatter
 from miscellaneous import check_argv_num, k_spaced_lambda, create_bins_from_midpoints
-from wavelet_plot import plot_result_lambda_hist
+from wavelet_plot import plot_result_lambda_hist, plot_polar_pcolormesh
 from wavelet import angle_error
+
+lambda_range = [3, 35]
+n_lambda = 60
 
 # prepare data
 check_argv_num(sys.argv, 4, '(results file 1, results file 1 name, results file 2, results file 2 name)')
@@ -56,15 +59,15 @@ ax.xaxis.set_major_formatter(StrMethodFormatter('{x:.0f}'))
 ax.xaxis.set_minor_formatter(StrMethodFormatter('{x:.0f}'))
 plt.tight_layout()
 plt.savefig(f'plots/results/wavelet_{filename_1[:-4]}_vs_{filename_2[:-4]}_lambda_comparison.png', dpi=300)
-plt.show()
+plt.close()
 
-lambdas, lambdas_edges = k_spaced_lambda([5, 35], 40)
+lambdas, lambdas_edges = k_spaced_lambda(lambda_range, n_lambda)
 plot_result_lambda_hist(l[f'lambda_{name_1}'], l[f'lambda_{name_2}'], lambdas_edges,
                         label1=f'{name_1} wavelength (km)', label2=f'{name_2} wavelength (km)')
 plt.plot(xy_line, xy_line, 'k--')
 plt.tight_layout()
 plt.savefig(f'plots/results/wavelet_{filename_1[:-4]}_vs_{filename_2[:-4]}_lambda_comparison_hist.png', dpi=300)
-plt.show()
+plt.close()
 
 # plot theta
 xy_line = [0, 180]
@@ -107,7 +110,7 @@ plt.xlim(0, 180)
 plt.ylim(0, 180)
 plt.tight_layout()
 plt.savefig(f'plots/results/wavelet_{filename_1[:-4]}_vs_{filename_2[:-4]}_theta_comparison.png', dpi=300)
-plt.show()
+plt.close()
 
 thetas = np.arange(0, 180, 5)
 thetas_edges = create_bins_from_midpoints(thetas)
@@ -119,7 +122,7 @@ plt.xlabel(f'{name_1} wavevector direction from north (deg)')
 plt.ylabel(f'{name_2} wavevector direction from north (deg)')
 plt.tight_layout()
 plt.savefig(f'plots/results/wavelet_{filename_1[:-4]}_vs_{filename_2[:-4]}_theta_comparison_hist.png', dpi=300)
-plt.show()
+plt.close()
 
 #df.reset_index()['date'].dt.month.value_counts().sort_index().plot(kind='bar')
 # df.reset_index()['region'].value_counts().plot(kind='bar')
@@ -131,22 +134,51 @@ plt.scatter(df['lambda_diff']/df[f'lambda_{name_1}'], df['theta_diff'])
 plt.xlabel(f'(lambda_{name_1} - lambda_{name_2}) / lambda_{name_1}')
 plt.ylabel(f'theta_{name_1} - theta_{name_2} (deg)')
 plt.tight_layout()
-plt.show()
+plt.close()
 
 plt.hist2d(df['lambda_diff']/df[f'lambda_{name_1}'], df['theta_diff'], bins=[40, 36])
 plt.xlabel(f'(lambda_{name_1} - lambda_{name_2}) / lambda_{name_1}')
 plt.ylabel(f'theta_{name_1} - theta_{name_2} (deg)')
 plt.tight_layout()
-plt.show()
+plt.close()
 
 plt.hist2d(abs(df['lambda_diff']/df[f'lambda_{name_1}']), abs(df['theta_diff']), bins=[40, 18])
 plt.xlabel(f'(lambda_{name_1} - lambda_{name_2}) / lambda_{name_1}')
 plt.ylabel(f'theta_{name_1} - theta_{name_2} (deg)')
 plt.tight_layout()
-plt.show()
+plt.close()
 
 plt.hist2d(df['lambda_diff']/df[f'lambda_{name_1}'], abs(df['theta_diff']), bins=[40, 18])
 plt.xlabel(f'(lambda_{name_1} - lambda_{name_2}) / lambda_{name_1}')
 plt.ylabel(f'theta_{name_1} - theta_{name_2} (deg)')
 plt.tight_layout()
+plt.close()
+
+plt.hist(df.lambda_sat, bins=np.linspace(*lambda_range, 21), label=name_1)
+plt.hist(df.lambda_ukv, hatch='/', fill=False,  bins=np.linspace(*lambda_range, 21), label=name_2)
+plt.xlabel('Wavelength (km)')
+plt.ylabel('Count')
+plt.legend()
+plt.tight_layout()
+plt.savefig(f'plots/results/wavelet_{filename_1[:-4]}_vs_{filename_2[:-4]}_lambda_hist.png')
+plt.close()
+
+plt.hist(df.theta_sat, bins=thetas_edges, label=name_1)
+plt.hist(df.theta_ukv, hatch='/', fill=False,  bins=thetas_edges, label=name_2)
+plt.xlabel('Orientation (deg)')
+plt.ylabel('Count')
+plt.legend()
+plt.tight_layout()
+plt.savefig(f'plots/results/wavelet_{filename_1[:-4]}_vs_{filename_2[:-4]}_theta_hist.png')
+plt.close()
+
+hist_1 = np.histogram2d(df[f'lambda_{name_1}'], df[f'theta_{name_1}'], bins=[lambdas_edges, thetas_edges])
+hist_2 = np.histogram2d(df[f'lambda_{name_2}'], df[f'theta_{name_2}'], bins=[lambdas_edges, thetas_edges])
+
+plot_polar_pcolormesh(*hist_1, cbarlabel='Count', vmax=np.max([hist_1[0], hist_2[0]]))
+plt.savefig(f'plots/results/wavelet_{filename_1[:-4]}_vs_{filename_2[:-4]}_{name_1}_2dhist.png')
+plt.show()
+
+plot_polar_pcolormesh(*hist_2, cbarlabel='Count', vmax=np.max([hist_1[0], hist_2[0]]))
+plt.savefig(f'plots/results/wavelet_{filename_1[:-4]}_vs_{filename_2[:-4]}_{name_2}_2dhist.png')
 plt.show()
