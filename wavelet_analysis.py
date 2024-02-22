@@ -1,5 +1,6 @@
 import datetime as dt
 import glob
+import numpy as np
 
 import pandas as pd
 import py_cwt2d
@@ -39,7 +40,7 @@ def get_seviri_img(datetime, region, stripe_test=False,
 
 if __name__ == '__main__':
     # options
-    test = False
+    test = True
     stripe_test = False
 
     lambda_min = 3
@@ -74,13 +75,13 @@ if __name__ == '__main__':
     lambdas, lambdas_edges = k_spaced_lambda([lambda_min, lambda_max], n_lambda)
     thetas = np.arange(0, 180, theta_bin_width)
     thetas_edges = create_bins_from_midpoints(thetas)
-    scales = omega_0x * lambdas / (2 * np.pi)
+    scales = lambdas * (omega_0x + np.sqrt(2 + omega_0x**2))/ (4 * np.pi)
 
     # initialise wavelet power spectrum array and fill
     pspec = np.zeros((*orig.shape, len(lambdas), len(thetas)))
     for i, theta in enumerate(thetas):
         cwt, wavnorm = py_cwt2d.cwt_2d(orig, scales, 'morlet', omega_0x=omega_0x, phi=np.deg2rad(90 + theta), epsilon=1)
-        pspec[..., i] = (abs(cwt) / scales / wavnorm) ** 2
+        pspec[..., i] = (abs(cwt) / scales) ** 2
 
     # calculate derived things
     pspec = np.ma.masked_less(pspec, pspec_threshold)
