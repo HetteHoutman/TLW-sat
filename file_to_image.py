@@ -12,7 +12,7 @@ from satpy import Scene
 from satpy.writers import get_enhanced_image
 
 
-def produce_scene(filename, bottomleft=None, topright=None, grid='latlon'):
+def produce_scene(filename, bottomleft=None, topright=None, grid='latlon', pixels_per_km=1):
     if bottomleft is None:
         bottomleft = [-11.5, 49.5]
 
@@ -40,8 +40,8 @@ def produce_scene(filename, bottomleft=None, topright=None, grid='latlon'):
 
         # TODO need to add clause for when x or y is exactly an integer (although might be unlikely...)
 
-        x_size = Lx / 1000
-        y_size = Ly / 1000
+        x_size = Lx / 1000 * pixels_per_km
+        y_size = Ly / 1000 * pixels_per_km
 
         # ensure sizes are odd
         if np.floor(x_size) % 2 == 1:

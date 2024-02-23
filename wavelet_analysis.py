@@ -18,7 +18,7 @@ def find_sat_file(root):
     return glob.glob('*.nat', root_dir=root)[0]
 
 
-def get_seviri_img(datetime, region, stripe_test=False,
+def get_seviri_img(datetime, region, stripe_test=False, pixels_per_km=1,
                    data_root="/storage/silver/metstudent/phd/sw825517/seviri_data/"):
 
     sat_file_root = data_root + datetime.strftime("%Y-%m-%d_%H") + '/'
@@ -26,14 +26,15 @@ def get_seviri_img(datetime, region, stripe_test=False,
 
     sat_bl, sat_tr, _, _ = get_sat_map_bltr(region, region_root='../tephiplot/regions/')
 
-    scene, crs = produce_scene(sat_file_root + sat_file, bottomleft=sat_bl, topright=sat_tr, grid='km')
+    scene, crs = produce_scene(sat_file_root + sat_file, bottomleft=sat_bl, topright=sat_tr, grid='km',
+                               pixels_per_km=pixels_per_km)
     Lx, Ly = extract_distances(scene['HRV'].y[::-1], scene['HRV'].x)
 
     # divide by 100 to convert from % to 0-1
     orig = np.array(scene['HRV'].data) / 100
 
     if stripe_test:
-        orig = stripey_test(orig, Lx, Ly, [10, 30], [15, 100], wiggle=0, wiggle_wavelength=20)
+        orig = stripey_test(orig, Lx, Ly, [4,4], [30, 90], wiggle=0, wiggle_wavelength=20)
 
     return orig, Lx, Ly
 
@@ -41,15 +42,16 @@ def get_seviri_img(datetime, region, stripe_test=False,
 if __name__ == '__main__':
     # options
     test = True
-    stripe_test = False
+    stripe_test = True
 
+    pixels_per_km = 4
     lambda_min = 3
     lambda_max = 35
     theta_bin_width = 5
     omega_0x = 6
     pspec_threshold = 1e-2
 
-    block_size = 51
+    block_size = 50*pixels_per_km + 1
     n_lambda = 60
 
     # settings
@@ -67,15 +69,17 @@ if __name__ == '__main__':
         save_path = f'./plots/test/'
 
     # produce image
-    orig, Lx, Ly = get_seviri_img(datetime, region, stripe_test=stripe_test)
+    orig, Lx, Ly = get_seviri_img(datetime, region, stripe_test=stripe_test, pixels_per_km=pixels_per_km)
 
     # enhance image
+    # orig -= orig.min()
+    # orig /= orig.max()
     orig = orig > threshold_local(orig, block_size, method='gaussian')
 
     lambdas, lambdas_edges = k_spaced_lambda([lambda_min, lambda_max], n_lambda)
     thetas = np.arange(0, 180, theta_bin_width)
     thetas_edges = create_bins_from_midpoints(thetas)
-    scales = lambdas * (omega_0x + np.sqrt(2 + omega_0x**2))/ (4 * np.pi)
+    scales = lambdas * (omega_0x + np.sqrt(2 + omega_0x**2))/ (4 * np.pi) * pixels_per_km
 
     # initialise wavelet power spectrum array and fill
     pspec = np.zeros((*orig.shape, len(lambdas), len(thetas)))
