@@ -42,14 +42,15 @@ def get_seviri_img(datetime, region, stripe_test=False, pixels_per_km=1,
 if __name__ == '__main__':
     # options
     test = True
-    stripe_test = True
+    stripe_test = False
 
-    pixels_per_km = 4
+    pixels_per_km = 1
     lambda_min = 3
     lambda_max = 35
     theta_bin_width = 5
     omega_0x = 6
-    pspec_threshold = 1e-2
+    pspec_threshold = 5e-4
+    # pspec_threshold = 1e-4
 
     block_size = 50*pixels_per_km + 1
     n_lambda = 60
@@ -72,9 +73,11 @@ if __name__ == '__main__':
     orig, Lx, Ly = get_seviri_img(datetime, region, stripe_test=stripe_test, pixels_per_km=pixels_per_km)
 
     # enhance image
-    # orig -= orig.min()
-    # orig /= orig.max()
-    orig = orig > threshold_local(orig, block_size, method='gaussian')
+    orig -= orig.min()
+    orig /= orig.max()
+    # orig = orig > threshold_local(orig, block_size, method='gaussian')
+    from skimage.exposure import equalize_hist
+    orig = equalize_hist(orig)
 
     lambdas, lambdas_edges = k_spaced_lambda([lambda_min, lambda_max], n_lambda)
     thetas = np.arange(0, 180, theta_bin_width)
@@ -89,18 +92,24 @@ if __name__ == '__main__':
 
     # calculate derived things
     pspec = np.ma.masked_less(pspec, pspec_threshold)
+
+    # e-folding distance for Morlet
+    efold_dist = np.sqrt(2) * scales
+    coi_mask = cone_of_influence_mask(pspec.data, efold_dist, pixels_per_km)
+    pspec = np.ma.masked_where(pspec.mask | coi_mask, pspec.data)
+
     threshold_mask_idx = np.argwhere(~pspec.mask)
     strong_lambdas, strong_thetas = lambdas[threshold_mask_idx[:, -2]], thetas[threshold_mask_idx[:, -1]]
 
-    max_pspec = np.ma.masked_less(pspec.data.max((-2, -1)), pspec_threshold)
-    max_lambdas, max_thetas = max_lambda_theta(pspec.data, lambdas, thetas)
+    max_pspec = pspec.max((-2, -1))
+    max_lambdas, max_thetas = max_lambda_theta(pspec, lambdas, thetas)
 
     avg_pspec = np.ma.masked_less(pspec.data, pspec_threshold / 2).mean((0, 1))
 
     # histograms
     strong_hist, _, _ = np.histogram2d(strong_lambdas, strong_thetas, bins=[lambdas_edges, thetas_edges])
-    max_hist, _, _ = np.histogram2d(max_lambdas[~max_pspec.mask], max_thetas[~max_pspec.mask],
-                                    bins=[lambdas_edges, thetas_edges])
+    # strong_hist /= np.repeat(lambdas[..., np.newaxis],  len(thetas), axis=1)
+    max_hist, _, _ = np.histogram2d(max_lambdas.flatten(), max_thetas.flatten(), bins=[lambdas_edges, thetas_edges])
 
     # histogram smoothing (tile along theta-axis and select middle part so that smoothing is periodic over theta
     strong_hist_smoothed = gaussian(np.tile(strong_hist, 3))[:, strong_hist.shape[1]:strong_hist.shape[1] * 2]
@@ -128,7 +137,7 @@ if __name__ == '__main__':
     plt.close()
 
     # plot histograms
-    plot_k_histogram(max_lambdas[~max_pspec.mask], max_thetas[~max_pspec.mask], lambdas_edges, thetas_edges)
+    plot_k_histogram(max_lambdas.flatten(), max_thetas.flatten(), lambdas_edges, thetas_edges)
     plt.savefig(save_path + 'wavelet_k_histogram_max.png', dpi=300)
     plt.close()
 
