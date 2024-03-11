@@ -49,8 +49,9 @@ if __name__ == '__main__':
     lambda_max = 35
     theta_bin_width = 5
     omega_0x = 6
-    pspec_threshold = 5e-4
-    # pspec_threshold = 1e-4
+    # pspec_threshold = 5e-4
+    pspec_threshold = 1e-4
+    # pspec_threshold = 1e-2
 
     block_size = 50*pixels_per_km + 1
     n_lambda = 60
@@ -77,7 +78,7 @@ if __name__ == '__main__':
     orig /= orig.max()
     # orig = orig > threshold_local(orig, block_size, method='gaussian')
     from skimage.exposure import equalize_hist
-    orig = equalize_hist(orig)
+    # orig = equalize_hist(orig)
 
     lambdas, lambdas_edges = k_spaced_lambda([lambda_min, lambda_max], n_lambda)
     thetas = np.arange(0, 180, theta_bin_width)
@@ -108,8 +109,8 @@ if __name__ == '__main__':
 
     # histograms
     strong_hist, _, _ = np.histogram2d(strong_lambdas, strong_thetas, bins=[lambdas_edges, thetas_edges])
-    # strong_hist /= np.repeat(lambdas[..., np.newaxis],  len(thetas), axis=1)
-    max_hist, _, _ = np.histogram2d(max_lambdas.flatten(), max_thetas.flatten(), bins=[lambdas_edges, thetas_edges])
+    strong_hist /= np.repeat(lambdas[..., np.newaxis],  len(thetas), axis=1)
+    max_hist, _, _ = np.histogram2d(max_lambdas[~max_lambdas.mask].flatten(), max_thetas[~max_lambdas.mask].flatten(), bins=[lambdas_edges, thetas_edges])
 
     # histogram smoothing (tile along theta-axis and select middle part so that smoothing is periodic over theta
     strong_hist_smoothed = gaussian(np.tile(strong_hist, 3))[:, strong_hist.shape[1]:strong_hist.shape[1] * 2]
@@ -162,8 +163,8 @@ if __name__ == '__main__':
     # save results
     if not test:
         csv_root = '../tephiplot/wavelet_results/'
-        csv_file = f'sat_adapt_thresh_{block_size}.csv'
-
+        # csv_file = f'sat_adapt_thresh_{block_size}.csv'
+        csv_file = f'sat_normalised_lambdadiv1.csv'
         try:
             df = pd.read_csv(csv_root + csv_file, index_col=[0, 1, 2], parse_dates=[0])
         except FileNotFoundError:
