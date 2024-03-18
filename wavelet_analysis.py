@@ -41,7 +41,7 @@ def get_seviri_img(datetime, region, stripe_test=False, pixels_per_km=1,
 
 if __name__ == '__main__':
     # options
-    test = True
+    test = False
     stripe_test = False
 
     pixels_per_km = 1
@@ -50,8 +50,8 @@ if __name__ == '__main__':
     theta_bin_width = 5
     omega_0x = 6
     # pspec_threshold = 5e-4
-    pspec_threshold = 1e-4
-    # pspec_threshold = 1e-2
+    # pspec_threshold = 1e-4
+    pspec_threshold = 1e-2
 
     block_size = 50*pixels_per_km + 1
     n_lambda = 60
@@ -74,13 +74,14 @@ if __name__ == '__main__':
     orig, Lx, Ly = get_seviri_img(datetime, region, stripe_test=stripe_test, pixels_per_km=pixels_per_km)
 
     # enhance image
-    orig -= orig.min()
-    orig /= orig.max()
+    # orig -= orig.min()
+    # orig /= orig.max()
     # orig = orig > threshold_local(orig, block_size, method='gaussian')
-    from skimage.exposure import equalize_hist
+    # from skimage.exposure import equalize_hist
     # orig = equalize_hist(orig)
 
     lambdas, lambdas_edges = k_spaced_lambda([lambda_min, lambda_max], n_lambda)
+    # lambdas, lambdas_edges = log_spaced_lambda([lambda_min, lambda_max], 1.04252)
     thetas = np.arange(0, 180, theta_bin_width)
     thetas_edges = create_bins_from_midpoints(thetas)
     scales = lambdas * (omega_0x + np.sqrt(2 + omega_0x**2))/ (4 * np.pi) * pixels_per_km
@@ -91,6 +92,7 @@ if __name__ == '__main__':
         cwt, wavnorm = py_cwt2d.cwt_2d(orig, scales, 'morlet', omega_0x=omega_0x, phi=np.deg2rad(90 + theta), epsilon=1)
         pspec[..., i] = (abs(cwt) / scales) ** 2
 
+    pspec /= orig.var()
     # calculate derived things
     pspec = np.ma.masked_less(pspec, pspec_threshold)
 
@@ -111,28 +113,31 @@ if __name__ == '__main__':
     strong_hist, _, _ = np.histogram2d(strong_lambdas, strong_thetas, bins=[lambdas_edges, thetas_edges])
     strong_hist /= np.repeat(lambdas[..., np.newaxis],  len(thetas), axis=1)
     max_hist, _, _ = np.histogram2d(max_lambdas[~max_lambdas.mask].flatten(), max_thetas[~max_lambdas.mask].flatten(), bins=[lambdas_edges, thetas_edges])
+    max_hist /= np.repeat(lambdas[..., np.newaxis],  len(thetas), axis=1)
 
     # histogram smoothing (tile along theta-axis and select middle part so that smoothing is periodic over theta
     strong_hist_smoothed = gaussian(np.tile(strong_hist, 3))[:, strong_hist.shape[1]:strong_hist.shape[1] * 2]
     max_hist_smoothed = gaussian(np.tile(max_hist, 3))[:, max_hist.shape[1]:max_hist.shape[1] * 2]
 
     # determine maximum in smoothed histogram
-    lambda_selected, theta_selected, lambda_bounds, theta_bounds = find_polar_max_and_error(strong_hist_smoothed,
+    # lambda_selected, theta_selected, lambda_bounds, theta_bounds = find_polar_max_and_error(strong_hist_smoothed,
+    #                                                                                         lambdas, thetas)
+    lambda_selected, theta_selected, lambda_bounds, theta_bounds = find_polar_max_and_error(max_hist_smoothed,
                                                                                             lambdas, thetas)
 
     # plot images
     # TODO for some reason a negative value/level is sometimes passed to colorbar here
-    plot_contour_over_image(orig, max_pspec, Lx, Ly, cbarlabel='Maximum of wavelet power spectrum',
-                            alpha=0.5, norm='log')
+    plot_contour_over_image(orig, max_pspec, Lx, Ly, cbarlabels=[r'TOA reflectance', r'$\max$ $P(\lambda, \vartheta)/\sigma^2$'],
+                            alpha=0.5)
     plt.savefig(save_path + 'wavelet_pspec_max.png', dpi=300)
     plt.close()
 
-    plot_contour_over_image(orig, max_lambdas, Lx, Ly, cbarlabel='Dominant wavelength (km)',
+    plot_contour_over_image(orig, max_lambdas, Lx, Ly, cbarlabels=[r'Vertical velocity $\mathregular{(ms^{-1})}$', 'Dominant wavelength (km)'],
                             alpha=0.5)
     plt.savefig(save_path + 'wavelet_dom_lambda.png', dpi=300)
     plt.close()
 
-    plot_contour_over_image(orig, max_thetas, Lx, Ly, cbarlabel='Dominant orientation (degrees from North)',
+    plot_contour_over_image(orig, max_thetas, Lx, Ly, cbarlabels=[r'Vertical velocity $\mathregular{(ms^{-1})}$', 'Dominant orientation (degrees from North)'],
                             alpha=0.5)
     plt.savefig(save_path + 'wavelet_dom_theta.png', dpi=300)
     plt.close()
@@ -147,12 +152,12 @@ if __name__ == '__main__':
     plt.savefig(save_path + 'wavelet_k_histogram_full_pspec.png', dpi=300)
     plt.close()
 
-    plot_polar_pcolormesh(strong_hist, lambdas_edges, thetas_edges, cbarlabel='Dominant wavelet count')
+    plot_polar_pcolormesh(np.ma.masked_equal(strong_hist, 0), lambdas_edges, thetas_edges, cbarlabel='Dominant wavelet count', vmin=0)
     plt.scatter(np.deg2rad(theta_selected), lambda_selected, marker='x', color='k')
     plt.savefig(save_path + 'wavelet_k_histogram_strong_pspec_polar.png', dpi=300)
     plt.close()
 
-    plot_polar_pcolormesh(max_hist, lambdas_edges, thetas_edges, cbarlabel='Dominant wavelet count')
+    plot_polar_pcolormesh(np.ma.masked_equal(max_hist, 0), lambdas_edges, thetas_edges, cbarlabel='Dominant wavelet count', vmin=0)
     plt.savefig(save_path + 'wavelet_k_histogram_max_pspec_polar.png', dpi=300)
     plt.close()
 
@@ -164,7 +169,7 @@ if __name__ == '__main__':
     if not test:
         csv_root = '../tephiplot/wavelet_results/'
         # csv_file = f'sat_adapt_thresh_{block_size}.csv'
-        csv_file = f'sat_normalised_lambdadiv1.csv'
+        csv_file = f'sat_norm_div1_maxhist_vartresh1e-2.csv'
         try:
             df = pd.read_csv(csv_root + csv_file, index_col=[0, 1, 2], parse_dates=[0])
         except FileNotFoundError:
