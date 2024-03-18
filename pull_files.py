@@ -1,5 +1,9 @@
+import os
+import shutil
+
 import eumdac
 import numpy as np
+import pandas as pd
 
 consumer_key = '9Kplg3cMsnqL3Uzo_aZrhUqwOu8a'
 consumer_secret = 'Hf9qKiMD3UWKOoMV2_uku0fdHv8a'
@@ -10,19 +14,14 @@ token = eumdac.AccessToken(credentials)
 datastore = eumdac.DataStore(token)
 selected_collection = datastore.get_collection('EO:EUM:DAT:MSG:HRSEVIRI')
 
-import shutil
-import pandas as pd
-import os
-
-df = pd.read_excel('../../other_data/list_of_cases.xlsx', parse_dates=[0])
-df.h = df.h.astype('int')
-datetimes = [date.replace(hour=hour) for date, hour in zip(df.dates, df.h)]
-ddir = r"C:\Users\sw825517\OneDrive - University of Reading\research\code\eumetsat"
+df = pd.read_excel('../list_of_cases.xlsx', parse_dates=[0])
+datetimes = [date.replace(hour=int(hour)) for date, hour in zip(df.dates, df.h) if date.year == 2023]
+ddir = '/storage/silver/metstudent/phd/sw825517/'
 
 for start in datetimes:
     if start.year == 2023:
         dt = np.timedelta64(15, 'm')
-        dir_name = 'data/' + start.strftime('%Y-%m-%d_%H')
+        dir_name = ddir + 'seviri_data/' + start.strftime('%Y-%m-%d_%H')
 
         if os.path.exists(dir_name):
             continue
@@ -44,8 +43,9 @@ for start in datetimes:
                         open(fsrc.name, mode='wb') as fdst:
                     shutil.copyfileobj(fsrc, fdst)
                     print(f'Download of product {product} finished.')
+                    fdst.close()
                     print(f'Unpacking {fdst.name}')
-                    shutil.unpack_archive(fdst.name, extract_dir=ddir + '/data/' + start.strftime('%Y-%m-%d_%H'))
+                    shutil.unpack_archive(fdst.name, extract_dir=ddir + '/seviri_data/' + start.strftime('%Y-%m-%d_%H'))
 
                 os.remove(fdst.name)
                 print(f'Removed {fdst.name}')
