@@ -1,9 +1,13 @@
+import sys
+
 import datetime as dt
 import glob
 import numpy as np
 
 import pandas as pd
 import py_cwt2d
+from skimage.feature import peak_local_max
+
 from fourier import *
 from miscellaneous import *
 from prepare_metadata import get_sat_map_bltr
@@ -49,14 +53,13 @@ if __name__ == '__main__':
     lambda_max = 35
     theta_bin_width = 5
     omega_0x = 6
-    # pspec_threshold = 5e-4
-    # pspec_threshold = 1e-4
     pspec_threshold = 1e-2
 
     block_size = 50*pixels_per_km + 1
-    n_lambda = 60
+    n_lambda = 50
 
     # settings
+    print('Running ' + sys.argv[1] + ' ' + sys.argv[2])
     check_argv_num(sys.argv, 2, "(datetime (YYYY-MM-DD_HH), region)")
     datetime_string = sys.argv[1]
     datetime = dt.datetime.strptime(datetime_string, '%Y-%m-%d_%H')
@@ -73,15 +76,9 @@ if __name__ == '__main__':
     # produce image
     orig, Lx, Ly = get_seviri_img(datetime, region, stripe_test=stripe_test, pixels_per_km=pixels_per_km)
 
-    # enhance image
-    # orig -= orig.min()
-    # orig /= orig.max()
-    # orig = orig > threshold_local(orig, block_size, method='gaussian')
-    # from skimage.exposure import equalize_hist
-    # orig = equalize_hist(orig)
-
-    lambdas, lambdas_edges = k_spaced_lambda([lambda_min, lambda_max], n_lambda)
-    # lambdas, lambdas_edges = log_spaced_lambda([lambda_min, lambda_max], 1.04252)
+    factor = (lambda_max / lambda_min) ** (1 / (n_lambda -1))
+    # have two spots before and after lambda range for finding local maxima
+    lambdas, lambdas_edges = log_spaced_lambda([lambda_min / factor ** 2, lambda_max * factor ** 2], factor)
     thetas = np.arange(0, 180, theta_bin_width)
     thetas_edges = create_bins_from_midpoints(thetas)
     scales = lambdas * (omega_0x + np.sqrt(2 + omega_0x**2))/ (4 * np.pi) * pixels_per_km
@@ -111,19 +108,24 @@ if __name__ == '__main__':
 
     # histograms
     strong_hist, _, _ = np.histogram2d(strong_lambdas, strong_thetas, bins=[lambdas_edges, thetas_edges])
-    strong_hist /= np.repeat(lambdas[..., np.newaxis],  len(thetas), axis=1)
     max_hist, _, _ = np.histogram2d(max_lambdas[~max_lambdas.mask].flatten(), max_thetas[~max_lambdas.mask].flatten(), bins=[lambdas_edges, thetas_edges])
-    max_hist /= np.repeat(lambdas[..., np.newaxis],  len(thetas), axis=1)
 
     # histogram smoothing (tile along theta-axis and select middle part so that smoothing is periodic over theta
     strong_hist_smoothed = gaussian(np.tile(strong_hist, 3))[:, strong_hist.shape[1]:strong_hist.shape[1] * 2]
     max_hist_smoothed = gaussian(np.tile(max_hist, 3))[:, max_hist.shape[1]:max_hist.shape[1] * 2]
 
-    # determine maximum in smoothed histogram
-    # lambda_selected, theta_selected, lambda_bounds, theta_bounds = find_polar_max_and_error(strong_hist_smoothed,
-    #                                                                                         lambdas, thetas)
-    lambda_selected, theta_selected, lambda_bounds, theta_bounds = find_polar_max_and_error(max_hist_smoothed,
-                                                                                            lambdas, thetas)
+    # find peaks
+    peak_idxs = peak_local_max(max_hist_smoothed)
+
+    # only keep peaks which correspond to an area of larger than area_threshold times lambda^2
+    area_threshold = 1
+    area_condition = (max_hist_smoothed / np.repeat(lambdas[..., np.newaxis],  len(thetas), axis=1) **2 )[tuple(peak_idxs.T)] > area_threshold
+    # only keep peaks within lambda range
+    lambda_condition = (lambdas[peak_idxs[:,0]] >= 3) & (lambdas[peak_idxs[:,0]] <= 35)
+
+    peak_idxs = peak_idxs[area_condition & lambda_condition]
+    lambdas_selected, thetas_selected = lambdas[peak_idxs[:,0]], thetas[peak_idxs[:,1]]
+    areas_selected = max_hist_smoothed[tuple(peak_idxs.T)]
 
     # plot images
     # TODO for some reason a negative value/level is sometimes passed to colorbar here
@@ -143,21 +145,15 @@ if __name__ == '__main__':
     plt.close()
 
     # plot histograms
-    plot_k_histogram(max_lambdas.flatten(), max_thetas.flatten(), lambdas_edges, thetas_edges)
-    plt.savefig(save_path + 'wavelet_k_histogram_max.png', dpi=300)
-    plt.close()
-
-    plot_k_histogram(strong_lambdas, strong_thetas, lambdas_edges, thetas_edges)
-    plt.scatter(lambda_selected, theta_selected, marker='x', color='k')
-    plt.savefig(save_path + 'wavelet_k_histogram_full_pspec.png', dpi=300)
-    plt.close()
-
-    plot_polar_pcolormesh(np.ma.masked_equal(strong_hist, 0), lambdas_edges, thetas_edges, cbarlabel='Dominant wavelet count', vmin=0)
-    plt.scatter(np.deg2rad(theta_selected), lambda_selected, marker='x', color='k')
+    plot_polar_pcolormesh(np.ma.masked_equal(strong_hist, 0) / np.repeat(lambdas[..., np.newaxis],  len(thetas), axis=1) **2, lambdas_edges, thetas_edges, cbarlabel='Dominant wavelet count', vmin=0)
+    for l, t in zip(lambdas_selected, thetas_selected):
+        plt.scatter(np.deg2rad(t), l, marker='x', color='k')
     plt.savefig(save_path + 'wavelet_k_histogram_strong_pspec_polar.png', dpi=300)
     plt.close()
 
-    plot_polar_pcolormesh(np.ma.masked_equal(max_hist, 0), lambdas_edges, thetas_edges, cbarlabel='Dominant wavelet count', vmin=0)
+    plot_polar_pcolormesh(np.ma.masked_equal(max_hist, 0) / np.repeat(lambdas[..., np.newaxis],  len(thetas), axis=1) **2, lambdas_edges, thetas_edges, cbarlabel='Dominant wavelet count', vmin=0)
+    for l, t in zip(lambdas_selected, thetas_selected):
+        plt.scatter(np.deg2rad(t), l, marker='x', color='k')
     plt.savefig(save_path + 'wavelet_k_histogram_max_pspec_polar.png', dpi=300)
     plt.close()
 
@@ -168,24 +164,17 @@ if __name__ == '__main__':
     # save results
     if not test:
         csv_root = '../tephiplot/wavelet_results/'
-        # csv_file = f'sat_adapt_thresh_{block_size}.csv'
-        csv_file = f'sat_norm_div1_maxhist_vartresh1e-2.csv'
+        csv_file = f'new_test.csv'
         try:
-            df = pd.read_csv(csv_root + csv_file, index_col=[0, 1, 2], parse_dates=[0])
+            df = pd.read_csv(csv_root + csv_file, parse_dates=[0])
         except FileNotFoundError:
-            df = pd.read_csv(csv_root + 'template.csv', index_col=[0, 1, 2], parse_dates=[0])
+            df = pd.read_csv(csv_root + 'new_template.csv', parse_dates=[0])
 
-        df.sort_index(inplace=True)
+        # store peaks
+        for l, t, area in zip(lambdas_selected, thetas_selected, areas_selected):
+            df.loc[len(df)] = [datetime.date(), region, datetime.hour, l, t, area]
 
-        df.loc[(str(datetime.date()), region, datetime.hour), 'lambda'] = lambda_selected
-        df.loc[(str(datetime.date()), region, datetime.hour), 'lambda_min'] = lambda_bounds[0]
-        df.loc[(str(datetime.date()), region, datetime.hour), 'lambda_max'] = lambda_bounds[1]
-        df.loc[(str(datetime.date()), region, datetime.hour), 'theta'] = theta_selected
-        df.loc[(str(datetime.date()), region, datetime.hour), 'theta_min'] = theta_bounds[0]
-        df.loc[(str(datetime.date()), region, datetime.hour), 'theta_max'] = theta_bounds[1]
-
-        df.sort_index(inplace=True)
-        df.to_csv(csv_root + csv_file)
+        df.to_csv(csv_root + csv_file, index=False)
 
         # data_root = f'/storage/silver/metstudent/phd/sw825517/sat_pspecs/{datetime.strftime("%Y-%m-%d_%H")}/{region}/'
         # if not os.path.exists(data_root):
