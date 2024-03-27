@@ -45,7 +45,7 @@ def get_seviri_img(datetime, region, stripe_test=False, pixels_per_km=1,
 
 if __name__ == '__main__':
     # options
-    test = False
+    test = True
     stripe_test = False
 
     pixels_per_km = 1
@@ -115,17 +115,21 @@ if __name__ == '__main__':
     max_hist_smoothed = gaussian(np.tile(max_hist, 3))[:, max_hist.shape[1]:max_hist.shape[1] * 2]
 
     # find peaks
-    peak_idxs = peak_local_max(max_hist_smoothed)
+    peak_distance = 1
+    peak_idxs = peak_local_max(max_hist_smoothed, min_distance=peak_distance)
+    # peak_idxs = peak_local_max(max_hist, min_distance=peak_distance)
 
     # only keep peaks which correspond to an area of larger than area_threshold times lambda^2
     area_threshold = 1
     area_condition = (max_hist_smoothed / np.repeat(lambdas[..., np.newaxis],  len(thetas), axis=1) **2 )[tuple(peak_idxs.T)] > area_threshold
+    # area_condition = (max_hist / np.repeat(lambdas[..., np.newaxis],  len(thetas), axis=1) **2 )[tuple(peak_idxs.T)] > area_threshold
     # only keep peaks within lambda range
     lambda_condition = (lambdas[peak_idxs[:,0]] >= 3) & (lambdas[peak_idxs[:,0]] <= 35)
 
     peak_idxs = peak_idxs[area_condition & lambda_condition]
     lambdas_selected, thetas_selected = lambdas[peak_idxs[:,0]], thetas[peak_idxs[:,1]]
     areas_selected = max_hist_smoothed[tuple(peak_idxs.T)]
+    # areas_selected = max_hist[tuple(peak_idxs.T)]
 
     # plot images
     # TODO for some reason a negative value/level is sometimes passed to colorbar here
@@ -145,13 +149,13 @@ if __name__ == '__main__':
     plt.close()
 
     # plot histograms
-    plot_polar_pcolormesh(np.ma.masked_equal(strong_hist, 0) / np.repeat(lambdas[..., np.newaxis],  len(thetas), axis=1) **2, lambdas_edges, thetas_edges, cbarlabel='Dominant wavelet count', vmin=0)
+    plot_polar_pcolormesh(np.ma.masked_equal(strong_hist, 0) / np.repeat(lambdas[..., np.newaxis],  len(thetas), axis=1) **2, lambdas_edges, thetas_edges, cbarlabel=r'Area / $\lambda^2$', vmin=0)
     for l, t in zip(lambdas_selected, thetas_selected):
         plt.scatter(np.deg2rad(t), l, marker='x', color='k')
     plt.savefig(save_path + 'wavelet_k_histogram_strong_pspec_polar.png', dpi=300)
     plt.close()
 
-    plot_polar_pcolormesh(np.ma.masked_equal(max_hist, 0) / np.repeat(lambdas[..., np.newaxis],  len(thetas), axis=1) **2, lambdas_edges, thetas_edges, cbarlabel='Dominant wavelet count', vmin=0)
+    plot_polar_pcolormesh(np.ma.masked_equal(max_hist, 0) / np.repeat(lambdas[..., np.newaxis],  len(thetas), axis=1) **2, lambdas_edges, thetas_edges, cbarlabel=r'Area / $\lambda^2$', vmin=0)
     for l, t in zip(lambdas_selected, thetas_selected):
         plt.scatter(np.deg2rad(t), l, marker='x', color='k')
     plt.savefig(save_path + 'wavelet_k_histogram_max_pspec_polar.png', dpi=300)
@@ -164,7 +168,7 @@ if __name__ == '__main__':
     # save results
     if not test:
         csv_root = '../tephiplot/wavelet_results/'
-        csv_file = f'new_test.csv'
+        csv_file = f'sat_newalg.csv'
         try:
             df = pd.read_csv(csv_root + csv_file, parse_dates=[0])
         except FileNotFoundError:
