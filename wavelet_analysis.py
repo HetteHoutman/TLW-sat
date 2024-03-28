@@ -10,6 +10,7 @@ from skimage.feature import peak_local_max
 
 from fourier import *
 from miscellaneous import *
+from prepare_data import get_w_field_img
 from prepare_metadata import get_sat_map_bltr
 from skimage.filters import gaussian, threshold_local
 from wavelet import *
@@ -53,9 +54,13 @@ if __name__ == '__main__':
     lambda_max = 35
     theta_bin_width = 5
     omega_0x = 6
+    wind_deviation = 50
     pspec_threshold = 1e-2
 
+    leadtime = 0
     block_size = 50*pixels_per_km + 1
+    vertical_coord = 'air_pressure'
+    analysis_level = 70000
     n_lambda = 50
 
     # settings
@@ -75,6 +80,8 @@ if __name__ == '__main__':
 
     # produce image
     orig, Lx, Ly = get_seviri_img(datetime, region, stripe_test=stripe_test, pixels_per_km=pixels_per_km)
+    w, u, v, wind_dir, _, _ = get_w_field_img(datetime, region, leadtime=leadtime, coord=vertical_coord,
+                                              map_height=analysis_level)
 
     factor = (lambda_max / lambda_min) ** (1 / (n_lambda -1))
     # have two spots before and after lambda range for finding local maxima
@@ -90,14 +97,16 @@ if __name__ == '__main__':
         pspec[..., i] = (abs(cwt) / scales) ** 2
 
     pspec /= orig.var()
-    # calculate derived things
-    pspec = np.ma.masked_less(pspec, pspec_threshold)
 
-    # e-folding distance for Morlet
+    # exclude points: (1) less than threshold; (2) within COI; and (3) more than 50 deg from local UKV wind direction
+    threshold_mask = pspec < pspec_threshold
     efold_dist = np.sqrt(2) * scales
     coi_mask = cone_of_influence_mask(pspec.data, efold_dist, pixels_per_km)
-    pspec = np.ma.masked_where(pspec.mask | coi_mask, pspec.data)
+    wind_mask = abs(wind_dir.data[::-1, ..., None, None] - np.broadcast_to(thetas, pspec.shape)) > wind_deviation
 
+    pspec = np.ma.masked_where(threshold_mask | coi_mask | wind_mask, pspec)
+
+    # calculate derived things
     threshold_mask_idx = np.argwhere(~pspec.mask)
     strong_lambdas, strong_thetas = lambdas[threshold_mask_idx[:, -2]], thetas[threshold_mask_idx[:, -1]]
 
@@ -106,7 +115,7 @@ if __name__ == '__main__':
 
     avg_pspec = np.ma.masked_less(pspec.data, pspec_threshold / 2).mean((0, 1))
 
-    # histograms
+    # calculate histograms
     strong_hist, _, _ = np.histogram2d(strong_lambdas, strong_thetas, bins=[lambdas_edges, thetas_edges])
     max_hist, _, _ = np.histogram2d(max_lambdas[~max_lambdas.mask].flatten(), max_thetas[~max_lambdas.mask].flatten(), bins=[lambdas_edges, thetas_edges])
 
