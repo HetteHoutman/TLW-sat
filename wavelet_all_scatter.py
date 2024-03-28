@@ -28,7 +28,6 @@ df1.sort_index()
 df2.sort_index()
 
 df = df1.merge(df2, how='inner', left_index=True, right_index=True, suffixes=('_' + name_1, '_' + name_2))
-del (df1, df2)
 
 # df = df[(df['theta_ukv'] > 120) | (df['theta_ukv'] < 60)]
 # df = df[df[f'lambda_{name_2}'] < 10]
