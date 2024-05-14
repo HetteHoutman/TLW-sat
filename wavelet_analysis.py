@@ -1,3 +1,5 @@
+import iris
+import matplotlib.pyplot as plt
 import sys
 
 import datetime as dt
@@ -46,7 +48,7 @@ def get_seviri_img(datetime, region, stripe_test=False, pixels_per_km=1,
 
 if __name__ == '__main__':
     # options
-    test = True
+    test = False
     stripe_test = False
 
     pixels_per_km = 1
@@ -142,6 +144,15 @@ if __name__ == '__main__':
     # areas_selected = max_hist[tuple(peak_idxs.T)]
 
     # plot images
+    plot_wind_and_or(u, v, max_thetas, orig)
+    plt.savefig(save_path + 'winds_and_orientations.png', dpi=300)
+    plt.close()
+
+    wind_theta_diff = cube_from_array_and_cube((wind_dir.data - max_thetas[::-1])[None, ...], u)
+    plt.hist(wind_theta_diff[0].data[~wind_theta_diff[0].data.mask], bins=np.arange(-90, 95, 5))
+    plt.savefig(save_path + 'wind_theta_diff.png', dpi=300)
+    plt.close()
+
     # TODO for some reason a negative value/level is sometimes passed to colorbar here
     plot_contour_over_image(orig, max_pspec, Lx, Ly, cbarlabels=[r'TOA reflectance', r'$\max$ $P(\lambda, \vartheta)/\sigma^2$'],
                             alpha=0.5)
@@ -190,9 +201,11 @@ if __name__ == '__main__':
 
         df.to_csv(csv_root + csv_file, index=False)
 
-        # data_root = f'/storage/silver/metstudent/phd/sw825517/sat_pspecs/{datetime.strftime("%Y-%m-%d_%H")}/{region}/'
-        # if not os.path.exists(data_root):
-        #     os.makedirs(data_root)
+        data_root = f'/storage/silver/metstudent/phd/sw825517/sat_data/{datetime.strftime("%Y-%m-%d_%H")}/{region}/'
+        if not os.path.exists(data_root):
+            os.makedirs(data_root)
+        iris.save(wind_dir, data_root + 'wind_dir.nc')
+        iris.save(cube_from_array_and_cube(max_thetas[::-1][None, ...], u), data_root + 'max_thetas.nc')
         # np.save(data_root + 'pspec.npy', pspec.data)
         # np.save(data_root + 'lambdas.npy', lambdas)
         # np.save(data_root + 'thetas.npy', thetas)
