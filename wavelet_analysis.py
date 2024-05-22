@@ -48,7 +48,7 @@ def get_seviri_img(datetime, region, stripe_test=False, pixels_per_km=1,
 
 if __name__ == '__main__':
     # options
-    test = False
+    test = True
     stripe_test = False
 
     pixels_per_km = 1
