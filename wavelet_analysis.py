@@ -48,7 +48,7 @@ def get_seviri_img(datetime, region, stripe_test=False, pixels_per_km=1,
 
 if __name__ == '__main__':
     # options
-    test = True
+    test = False
     stripe_test = False
 
     pixels_per_km = 1
@@ -62,7 +62,7 @@ if __name__ == '__main__':
     leadtime = 0
     block_size = 50*pixels_per_km + 1
     vertical_coord = 'air_pressure'
-    analysis_level = 70000 
+    analysis_level = 80000
     n_lambda = 50
 
     # settings
@@ -105,20 +105,23 @@ if __name__ == '__main__':
     threshold_mask = pspec < pspec_threshold
     efold_dist = np.sqrt(2) * scales
     coi_mask = cone_of_influence_mask(pspec.data, efold_dist, pixels_per_km)
-    wind_mask = ((wind_dir.data[::-1, ..., None, None] % 180 - np.broadcast_to(thetas, pspec.shape)) % 180 > wind_deviation_thresh) & \
-                ((np.broadcast_to(thetas, pspec.shape) - wind_dir.data[::-1, ..., None, None] % 180) % 180 > wind_deviation_thresh)
 
-    pspec = np.ma.masked_where(threshold_mask | coi_mask | wind_mask, pspec)
+    pspec = np.ma.masked_where(threshold_mask | coi_mask, pspec)
 
     # calculate derived things
+    # strong stuff does not include wind restriction
     threshold_mask_idx = np.argwhere(~pspec.mask)
     strong_lambdas, strong_thetas = lambdas[threshold_mask_idx[:, -2]], thetas[threshold_mask_idx[:, -1]]
 
     max_pspec = pspec.max((-2, -1))
-    max_lambdas, max_thetas = max_lambda_theta(pspec, lambdas, thetas)
+    max_lambdas_nwr, max_thetas_nwr = max_lambda_theta(pspec, lambdas, thetas)
 
-    pspec_no_wind_restr = np.ma.masked_where(threshold_mask | coi_mask, pspec.data)
-    max_lambdas_nwr, max_thetas_nwr = max_lambda_theta(pspec_no_wind_restr, lambdas, thetas)
+    # now also exclude points that deviate too far from wind direc (but not for max_pspec so that you can keep old mask)
+    wind_mask = ((wind_dir.data[::-1] % 180 - max_thetas_nwr.data) % 180 > wind_deviation_thresh) & \
+                ((max_thetas_nwr.data - wind_dir.data[::-1] % 180) % 180 > wind_deviation_thresh)
+
+    max_lambdas = np.ma.masked_where(max_lambdas_nwr.mask | wind_mask, max_lambdas_nwr)
+    max_thetas = np.ma.masked_where(max_thetas_nwr.mask | wind_mask, max_thetas_nwr)
 
     # calculate histograms
     strong_hist, _, _ = np.histogram2d(strong_lambdas, strong_thetas, bins=[lambdas_edges, thetas_edges])
@@ -190,7 +193,7 @@ if __name__ == '__main__':
     # save results
     if not test:
         csv_root = '../tephiplot/wavelet_results/'
-        csv_file = f'sat_newalg_wind.csv'
+        csv_file = f'sat_newalg_wind_800.csv'
         try:
             df = pd.read_csv(csv_root + csv_file, parse_dates=[0])
         except FileNotFoundError:
@@ -207,12 +210,14 @@ if __name__ == '__main__':
         if not os.path.exists(data_root):
                 os.makedirs(data_root)
 
-        iris.save(wind_dir, data_root + 'wind_dir.nc')
-        np.save(data_root + 'max_thetas.npy', max_thetas.data)
-        np.save(data_root + 'mask.npy', max_thetas.mask)
-        np.save(data_root + 'max_thetas_nwr.npy', max_thetas_nwr.data)
-        np.save(data_root + 'mask_nwr.npy', max_thetas_nwr.mask)
-        np.save(data_root + 'std.npy', [np.sqrt(var)])
+        iris.save(wind_dir, data_root + 'wind_dir_800.nc')
+        np.save(data_root + 'max_thetas_800.npy', max_thetas.data)
+        np.save(data_root + 'max_lambdas_800.npy', max_lambdas.data)
+        np.save(data_root + 'mask_800.npy', max_thetas.mask) 
+        np.save(data_root + 'max_thetas_nwr_800.npy', max_thetas_nwr.data)
+        np.save(data_root + 'max_lambdas_nwr_800.npy', max_lambdas_nwr.data)
+        np.save(data_root + 'mask_nwr_800.npy', max_thetas_nwr.mask)
+        np.save(data_root + 'std_800.npy', [np.sqrt(var)])
         # np.save(data_root + 'pspec.npy', pspec.data)
         # np.save(data_root + 'lambdas.npy', lambdas)
         # np.save(data_root + 'thetas.npy', thetas)
