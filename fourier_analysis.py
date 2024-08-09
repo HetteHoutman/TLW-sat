@@ -99,7 +99,7 @@ if __name__ == '__main__':
     bounded_polar_pspec, bounded_wnum_vals = apply_wnum_bounds(radial_pspec, wnum_vals, wnum_bins,
                                                                (min_lambda, max_lambda))
 
-    # dominant_wnum_max, dominant_theta_max = find_max(bounded_polar_pspec, bounded_wnum_vals, theta_vals)
+    # dominant_wnum_max, dominant_theta_max = find_max(bounded_polar_pspec, bounded_wnum_vals, diff_vals)
     dom_wlen_max, dom_theta_max, dom_K_max, dom_L_max = find_cart_max(pspec_2d, K, L, wavelengths, thetas)
 
     # plot polar power spectrum along with maximum

@@ -163,7 +163,7 @@ if __name__ == '__main__':
 
     # TODO for some reason a negative value/level is sometimes passed to colorbar here
     plot_contour_over_image(orig, max_pspec, Lx, Ly, cbarlabels=[r'TOA reflectance', r'$\max$ $P(\lambda, \vartheta)/\sigma^2$'],
-                            alpha=0.5)
+                            pspec_thresh=pspec_threshold, alpha=0.5)
     plt.savefig(save_path + 'wavelet_pspec_max.png', dpi=300)
     plt.close()
 
@@ -193,7 +193,7 @@ if __name__ == '__main__':
     # save results
     if not test:
         csv_root = '../tephiplot/wavelet_results/'
-        csv_file = f'sat_newalg_wind_800.csv'
+        csv_file = f'sat_final_800.csv'
         try:
             df = pd.read_csv(csv_root + csv_file, parse_dates=[0])
         except FileNotFoundError:

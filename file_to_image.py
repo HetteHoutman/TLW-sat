@@ -61,7 +61,7 @@ def produce_scene(filename, bottomleft=None, topright=None, grid='latlon', pixel
     crs = a.to_cartopy_crs()
 
     scene2 = global_scene.resample(a)
-    return scene2, crs
+    return scene2, a
 
 
 def produce_image(scene2, crs, coastlines=False, save_name=None, save=False, great_circle=None):

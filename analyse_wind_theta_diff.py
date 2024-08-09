@@ -19,27 +19,31 @@ hist_wind_800 = np.zeros(len(wind_vals))
 hist_theta_600 = np.zeros(len(theta_vals))
 hist_theta_700 = np.zeros(len(theta_vals))
 hist_theta_800 = np.zeros(len(theta_vals))
+counter = 0
 for direc in glob.glob('/storage/silver/metstudent/phd/sw825517/ukv_data/2023*/*'):
-    max_thetas_600 = np.ma.masked_where(np.load(direc + '/mask_600.npy'), np.load(direc + '/max_thetas_600.npy'))
-    wind_dir_600 = iris.load(direc + '/wind_dir_600.nc')[0]
-    diff_600 = max_thetas_600 - wind_dir_600.data[::-1]
-    hist_diff_600 += np.histogram(diff_600[~diff_600.mask], bins=diff_bins)[0]
-    hist_wind_600 += np.histogram(wind_dir_600.data.flatten(), bins=wind_bins)[0]
-    hist_theta_600 += np.histogram(max_thetas_600[~max_thetas_600.mask], bins=theta_bins)[0]
+    try:
+        max_thetas_600 = np.ma.masked_where(np.load(direc + '/mask_600.npy'), np.load(direc + '/max_thetas_600.npy'))
+        wind_dir_600 = iris.load(direc + '/wind_dir_600.nc')[0]
+        diff_600 = max_thetas_600 - wind_dir_600.data[::-1]
+        hist_diff_600 += np.histogram(diff_600[~diff_600.mask], bins=diff_bins)[0]
+        hist_wind_600 += np.histogram(wind_dir_600.data.flatten(), bins=wind_bins)[0]
+        hist_theta_600 += np.histogram(max_thetas_600[~max_thetas_600.mask], bins=theta_bins)[0]
 
-    max_thetas_700 = np.ma.masked_where(np.load(direc + '/mask.npy'), np.load(direc + '/max_thetas.npy'))
-    wind_dir_700 = iris.load(direc + '/wind_dir.nc')[0]
-    diff_700 = max_thetas_700 - wind_dir_700.data[::-1]
-    hist_diff_700 += np.histogram(diff_700[~diff_700.mask], bins=diff_bins)[0]
-    hist_wind_700 += np.histogram(wind_dir_700.data.flatten(), bins=wind_bins)[0]
-    hist_theta_700 += np.histogram(max_thetas_700[~max_thetas_700.mask], bins=theta_bins)[0]
+        max_thetas_700 = np.ma.masked_where(np.load(direc + '/mask.npy'), np.load(direc + '/max_thetas.npy'))
+        wind_dir_700 = iris.load(direc + '/wind_dir.nc')[0]
+        diff_700 = max_thetas_700 - wind_dir_700.data[::-1]
+        hist_diff_700 += np.histogram(diff_700[~diff_700.mask], bins=diff_bins)[0]
+        hist_wind_700 += np.histogram(wind_dir_700.data.flatten(), bins=wind_bins)[0]
+        hist_theta_700 += np.histogram(max_thetas_700[~max_thetas_700.mask], bins=theta_bins)[0]
 
-    max_thetas_800 = np.ma.masked_where(np.load(direc + '/mask_800.npy'), np.load(direc + '/max_thetas_800.npy'))
-    wind_dir_800 = iris.load(direc + '/wind_dir_800.nc')[0]
-    diff_800 = max_thetas_800 - wind_dir_800.data[::-1]
-    hist_diff_800 += np.histogram(diff_800[~diff_800.mask], bins=diff_bins)[0]
-    hist_wind_800 += np.histogram(wind_dir_800.data.flatten(), bins=wind_bins)[0]
-    hist_theta_800 += np.histogram(max_thetas_800[~max_thetas_800.mask], bins=theta_bins)[0]
+        max_thetas_800 = np.ma.masked_where(np.load(direc + '/mask_800.npy'), np.load(direc + '/max_thetas_800.npy'))
+        wind_dir_800 = iris.load(direc + '/wind_dir_800.nc')[0]
+        diff_800 = max_thetas_800 - wind_dir_800.data[::-1]
+        hist_diff_800 += np.histogram(diff_800[~diff_800.mask], bins=diff_bins)[0]
+        hist_wind_800 += np.histogram(wind_dir_800.data.flatten(), bins=wind_bins)[0]
+        hist_theta_800 += np.histogram(max_thetas_800[~max_thetas_800.mask], bins=theta_bins)[0]
+    except:
+        counter += 1
 
 hist_theta_sat = np.zeros(len(theta_vals))
 hist_diff_sat = np.zeros(len(diff_vals))

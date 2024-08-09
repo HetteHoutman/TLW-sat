@@ -5,7 +5,8 @@
     <content url="file://$MODULE_DIR$/../useful_code/useful">
       <sourceFolder url="file://$MODULE_DIR$/../useful_code/useful" isTestSource="false" />
     </content>
-    <orderEntry type="jdk" jdkName="imageproc" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Remote Python 3.12.1 (sat, arc-ssh, eumetsat folder) (sftp://sw825517@arc-ssh.reading.ac.uk:22/home/users/sw825517/.conda/envs/sat/bin/python3.12)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="module" module-name="useful_code" />
   </component>
 </module>

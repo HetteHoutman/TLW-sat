@@ -42,6 +42,12 @@ df['theta_ukv'] = 90 -  np.rad2deg(np.arctan2(df['ky_ukv'], df['kx_ukv']))
 
 plot_result_lambda_hist(df['lambda'], df['lambda_ukv'], lambdas_edges,
                          label1='sat', label2='ukv')
+q25 = df.groupby(pd.cut(df[f'lambda'], lambdas_edges, include_lowest=True, right=False))[f'lambda_ukv'].quantile(0.25)
+medians = df.groupby(pd.cut(df[f'lambda'], lambdas_edges, include_lowest=True, right=False))[f'lambda_ukv'].quantile(0.5)
+q75 = df.groupby(pd.cut(df[f'lambda'], lambdas_edges, include_lowest=True, right=False))[f'lambda_ukv'].quantile(0.75)
+plt.plot(lambdas, medians, 'r-', label='UKV median')
+plt.fill_between(lambdas, q25.values, q75.values, color='r', alpha=0.35, label='UKV 25th - 75th percentile')
+
 plt.plot(lambda_range, lambda_range, 'k--', zorder=0)
 
 plt.savefig('plots/l_test.png', dpi=300)
